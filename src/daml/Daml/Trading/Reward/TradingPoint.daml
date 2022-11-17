@@ -1,1 +1,25 @@
 module Daml.Trading.Reward.TradingPoint where 
+
+template TradingPoint
+  with
+    seller : Party
+    buyer : Party
+    description: Text
+    exchangeAdmin: Party
+    amount: Decimal
+    issued: Time 
+    lastPrice: Decimal 
+    currency: Text
+    royaltyRate: Decimal
+  where
+    signatory seller, buyer
+    ensure seller /= buyer
+    observer exchangeAdmin
+    choice createBadge: ContractId createBadge
+        with
+            tradingpoints: ContractId TradingOffer
+        controller exchangeAdmin
+        do
+            tradingpoint <- fetch tradingpoints
+            getAmount tradingpoint === amount
+            create createBadge with ..

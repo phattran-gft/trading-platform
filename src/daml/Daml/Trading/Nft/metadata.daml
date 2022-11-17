@@ -1,0 +1,14 @@
+module Daml.Trading.Nft.metadata where 
+
+template NftCollectionSummary
+  with
+    collectionId : CollectionId
+    name : Text
+    symbol : Text
+    observers : Set Party
+  where
+    signatory collectionId.signatories
+    observer observers
+
+    key collectionId : CollectionId
+    maintainer key.signatories
