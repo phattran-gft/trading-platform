@@ -1,0 +1,54 @@
+module Daml.Trading.Scripts.CashSetup where 
+
+import DA.Map (empty, fromList)
+import DA.Set (singleton)
+import Daml.Script
+
+import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (F)
+import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
+import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (I)
+import Daml.Finance.Interface.Types.Common (Id(..), InstrumentKey(..))
+
+import Daml.Finance.Holding.Account qualified as Account (Factory(..))
+import Daml.Finance.Holding.Fungible qualified as Fungible (Factory(..))
+import Daml.Finance.Instrument.Base.Instrument (Instrument(..))
+
+import Daml.Trading.Scripts.UserSetup qualified as UserSetup (getDefaultParties)
+
+instrumentData = (Id "USD", "0")
+
+initialize : Script CashSetupState
+initialize = do 
+  [public, admin] <- UserSetup.getDefaultParties 
+
+  accountFactoryCid <- toInterfaceContractId @Account.F <$> submit admin do
+    createCmd Account.Factory
+      with
+        provider = admin
+        observers = empty
+
+  holdingFactoryCid <- toInterfaceContractId @Holding.F <$> submit admin do
+    createCmd Fungible.Factory
+      with
+        provider = admin
+        observers = fromList [("PublicObserver", singleton $ singleton public )]
+
+  let (instrumentId, instrumentVersion) = instrumentData
+  now <- getTime
+
+  cashInstrumentCid <- toInterfaceContractId @Instrument.I <$> submit admin do
+    createCmd Instrument
+      with
+        depository = admin
+        issuer = admin
+        id = instrumentId
+        description = "Instrument representing units of USD"
+        version = instrumentVersion
+        observers = empty
+        validAsOf = now
+
+  let cashInstrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
+
+  pure (public, admin, cashInstrument, accountFactoryCid, holdingFactoryCid)
+
+type CashSetupState = (Party, Party, InstrumentKey, ContractId Account.F, ContractId Holding.F)

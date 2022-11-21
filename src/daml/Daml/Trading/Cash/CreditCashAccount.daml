@@ -1,0 +1,32 @@
+module Daml.Trading.Cash.CreditCashAccount where 
+
+import Daml.Finance.Interface.Holding.Account qualified as Account (Credit(..), I, exerciseInterfaceByKey)
+import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
+import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K, qty)
+import Daml.Finance.Interface.Types.Common (AccountKey(..))
+
+template Request
+  with
+    account : AccountKey
+    instrument : Instrument.K
+    amount : Decimal
+  where
+    signatory account.owner
+    observer account.custodian
+
+    ensure amount > 0.0
+
+    choice Accept : ContractId Holding.I
+      controller account.custodian
+      do
+        Account.exerciseInterfaceByKey @Account.I account account.custodian Account.Credit
+          with
+            quantity = Instrument.qty amount instrument
+
+    choice Decline : ()
+      controller account.custodian
+      do pure ()
+
+    choice Withdraw : ()
+      controller account.owner
+      do pure ()
