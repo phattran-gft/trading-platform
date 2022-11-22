@@ -1,0 +1,47 @@
+module Daml.Trading.Tests.CashRedemption where 
+
+import Daml.Script
+
+import Daml.Trading.Cash.CreateCashAccount qualified as CreateCashAccount
+import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
+import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
+import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
+import Daml.Trading.Scripts.CashSetup qualified as CashSetup (initialize, instrumentData) 
+import Daml.Finance.Interface.Types.Common (InstrumentKey(..))
+import Daml.Trading.Cash.CashRedemption qualified as CashRedemption
+
+setup: Script () 
+setup = do 
+    (public, admin, cashInstrument, accountFactoryCid, holdingFactoryCid) <- CashSetup.initialize 
+    [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
+
+    aliceRequestCid <- submit alice do
+        createCmd CreateCashAccount.Request
+            with
+                owner = alice
+                custodian = admin
+    aliceAccount <- submit admin do
+        exerciseCmd aliceRequestCid CreateCashAccount.Accept
+            with
+                label = "Alice@Admin"
+                description = "Account of Alice at Admin"
+                accountFactoryCid = accountFactoryCid
+                holdingFactoryCid = holdingFactoryCid
+                observers = []
+    let (instrumentId, instrumentVersion) = CashSetup.instrumentData
+
+    aliceRequestCid <- submit alice do
+        createCmd CreditCashAccount.Request
+            with
+                account = aliceAccount
+                instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
+                amount = 1000.0
+
+    aliceHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
+
+    -- aliceRequestWithdrawal <- submit alice do
+    --     createCmd CashRedemption.RequestWithdrawal
+    --         with 
+    --             instrument = InstrumentKey with id = instrumentId; version = instrumentVersion
+    --             holdingCid = aliceHoldingCid
+    pure()
