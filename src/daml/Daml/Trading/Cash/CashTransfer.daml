@@ -1,0 +1,45 @@
+module Daml.Trading.Cash.CashTransfer where 
+
+import DA.Assert ((===))
+import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
+import Daml.Finance.Interface.Holding.Transferable qualified as Transferable (I, Transfer(..))
+import Daml.Finance.Interface.Holding.Util (getAmount, getInstrument)
+import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K)
+import Daml.Finance.Interface.Types.Common (AccountKey(..))
+
+template Request
+  with
+    receiverAccount : AccountKey
+    instrument : Instrument.K
+    amount : Decimal
+    currentOwner : Party
+  where
+    signatory receiverAccount.owner
+    observer currentOwner
+
+    ensure amount > 0.0
+
+    choice Accept : ContractId Holding.I
+      with
+        holdingCid : ContractId Holding.I
+      controller currentOwner
+      do
+        holding <- fetch holdingCid
+        getAmount holding === amount
+        getInstrument holding === instrument
+
+        let transferableCid : ContractId Transferable.I = coerceContractId holdingCid
+
+        newTransferableCid <- exercise transferableCid Transferable.Transfer
+          with
+            newOwnerAccount = receiverAccount
+
+        pure $ toInterfaceContractId @Holding.I newTransferableCid
+
+    choice Decline : ()
+      controller currentOwner
+      do pure ()
+
+    choice Withdraw : ()
+      controller receiverAccount.owner
+      do pure ()

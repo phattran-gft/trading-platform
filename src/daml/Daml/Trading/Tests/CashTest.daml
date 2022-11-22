@@ -1,0 +1,67 @@
+module Daml.Trading.Tests.CashTest where 
+
+import Daml.Script 
+
+import Daml.Finance.Interface.Types.Common (Id(..), InstrumentKey(..))
+
+import Daml.Trading.Cash.CreateCashAccount qualified as CreateCashAccount
+import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
+import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
+import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
+import Daml.Trading.Scripts.CashSetup qualified as CashSetup (initialize, instrumentData) 
+
+setup: Script () 
+setup = do 
+  (public, admin, cashInstrument, accountFactoryCid, holdingFactoryCid) <- CashSetup.initialize 
+  [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
+
+  aliceRequestCid <- submit alice do
+    createCmd CreateCashAccount.Request
+      with
+        owner = alice
+        custodian = admin
+  aliceAccount <- submit admin do
+    exerciseCmd aliceRequestCid CreateCashAccount.Accept
+      with
+        label = "Alice@Admin"
+        description = "Account of Alice at Admin"
+        accountFactoryCid = accountFactoryCid
+        holdingFactoryCid = holdingFactoryCid
+        observers = []
+
+  bobRequestCid <- submit bob do
+    createCmd CreateCashAccount.Request
+      with
+        owner = bob
+        custodian = admin
+  bobAccount <- submit admin do
+    exerciseCmd bobRequestCid CreateCashAccount.Accept
+      with
+        label = "Bob@Admin"
+        description = "Account of Bob at Admin"
+        accountFactoryCid = accountFactoryCid
+        holdingFactoryCid = holdingFactoryCid
+        observers = [alice]
+
+  let (instrumentId, instrumentVersion) = CashSetup.instrumentData
+
+  aliceRequestCid <- submit alice do
+    createCmd CreditCashAccount.Request
+      with
+        account = aliceAccount
+        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
+        amount = 1000.0
+
+  aliceCashHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
+
+  transferRequestCid <- submit bob do
+    createCmd CashTransfer.Request
+      with
+        receiverAccount = bobAccount
+        instrument = cashInstrument
+        amount = 1000.0
+        currentOwner = alice
+
+  newHoldingCid <- submitMulti [alice] [public] do exerciseCmd transferRequestCid CashTransfer.Accept with holdingCid = aliceCashHoldingCid
+
+  pure ()
