@@ -1,58 +1,47 @@
 module Daml.Trading.Cash.CashRedemption where 
 
-import Daml.Finance.Interface.Holding.Account qualified as Account ( Debit(..), R)
-import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (F)
-import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
+-- import Daml.Finance.Interface.Holding.Account qualified as Account ( Debit(..), R)
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
-import Daml.Finance.Interface.Holding.Util (getAccount)
-import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K)
-import Daml.Finance.Interface.Lifecycle.Rule.Claim qualified as Lifecycle (Claim)
-
-import Daml.Trading.Cash.Util (fetchAndArchive)
-
-template Service
-    with
-        operator : Party
-        provider : Party
-        customer : Party
-        claimRuleCid : ContractId Lifecycle.Claim
-        accountFactoryCid : ContractId Account.F
-        holdingFactoryCid : ContractId Holding.F
-    where
-        signatory operator, provider, customer
-        key (operator, provider, customer) : (Party, Party, Party)
-        maintainer key._1
-        
-        nonconsuming choice RequestWithdrawal : ContractId WithdrawalRequest
-            with
-                instrument : Instrument.K
-                holdingCid : ContractId Holding.I
-            controller customer
-            do
-                create WithdrawalRequest with ..
-
-        nonconsuming choice Withdrawal : ()
-            with
-                withdrawalRequestCid : ContractId WithdrawalRequest
-            controller provider
-            do
-                WithdrawalRequest{holdingCid} <- fetchAndArchive withdrawalRequestCid
-                holding <- fetch holdingCid
-                let account = getAccount holding
-                (_, ref) <- fetchByKey @Account.R account
-                exercise ref.cid Account.Debit with holdingCid
+import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
+import Daml.Finance.Interface.Types.Common (InstrumentKey(..),AccountKey(..))
+import Daml.Trading.Scripts.CashSetup qualified as CashSetup (instrumentData) 
 
 template WithdrawalRequest
-  with
-    operator : Party
-    provider : Party
-    customer : Party
-    holdingCid : ContractId Holding.I
-  where
-    signatory operator, provider, customer
+    with
+        operator : Party
+        customer : Party
+        holdingCid : ContractId Holding.I
+    where
+        signatory customer
+        observer operator
+        choice Accept : ()
+            with
+                adminWallet : AccountKey
+                amount : Decimal
+            controller operator
+            do
+                let
+                    (instrumentId, instrumentVersion) = CashSetup.instrumentData
+                    cashInstrument = InstrumentKey with issuer = operator; depository = operator; id = instrumentId; version = instrumentVersion
+                transferRequest <- create CashTransfer.Request
+                    with
+                        receiverAccount = adminWallet
+                        instrument = cashInstrument
+                        amount = amount
+                        currentOwner = customer
 
+                adminWallet <- exercise transferRequest CashTransfer.Accept
+                    with
+                        holdingCid = holdingCid
+                -- TODO archive adminWallet
+                -- archive adminWallet
+            
+                pure()
 
+        choice Decline : ()
+            controller operator
+            do pure ()
 
-
-
-
+        choice Cancel : ()
+            controller customer
+            do pure ()

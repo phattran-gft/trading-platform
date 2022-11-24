@@ -4,7 +4,6 @@ import Daml.Script
 
 import Daml.Trading.Cash.CreateCashAccount qualified as CreateCashAccount
 import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
-import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
 import Daml.Trading.Scripts.CashSetup qualified as CashSetup (initialize, instrumentData) 
 import Daml.Finance.Interface.Types.Common (InstrumentKey(..))
@@ -39,9 +38,30 @@ setup = do
 
     aliceHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
 
-    -- aliceRequestWithdrawal <- submit alice do
-    --     createCmd CashRedemption.RequestWithdrawal
-    --         with 
-    --             instrument = InstrumentKey with id = instrumentId; version = instrumentVersion
-    --             holdingCid = aliceHoldingCid
+    adminRequestCid <- submit admin do
+        createCmd CreateCashAccount.Request
+            with
+                owner = admin
+                custodian = admin
+    adminAccount <- submit admin do
+        exerciseCmd adminRequestCid CreateCashAccount.Accept
+            with
+                label = "Admin@Admin"
+                description = "Account of Admin"
+                accountFactoryCid = accountFactoryCid
+                holdingFactoryCid = holdingFactoryCid
+                observers = [alice]
+
+    aliceRequestWithdrawal <- submit alice do
+        createCmd CashRedemption.WithdrawalRequest
+            with 
+                operator = admin
+                customer = alice
+                holdingCid = aliceHoldingCid
+
+    submit admin do 
+        exerciseCmd aliceRequestWithdrawal CashRedemption.Accept
+            with
+                adminWallet = adminAccount
+                amount = 1000.0
     pure()
