@@ -13,6 +13,7 @@ import Daml.Finance.Holding.Account qualified as Account (Factory(..))
 import Daml.Finance.Holding.Fungible qualified as Fungible (Factory(..))
 import Daml.Finance.Instrument.Base.Instrument (Instrument(..))
 
+import Daml.Trading.Account.CreateAccount (AccountFactoryReference(..), HoldingFactoryReference(..))
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (getDefaultParties)
 
 instrumentData = (Id "USD", "0")
@@ -26,12 +27,25 @@ initialize = do
       with
         provider = admin
         observers = empty
+  
+  submit admin do 
+    createCmd AccountFactoryReference 
+      with 
+        provider = admin 
+        accountFactoryCid
 
   holdingFactoryCid <- toInterfaceContractId @Holding.F <$> submit admin do
     createCmd Fungible.Factory
       with
         provider = admin
         observers = fromList [("PublicObserver", singleton $ singleton public )]
+  
+  submit admin do 
+    createCmd HoldingFactoryReference 
+      with 
+        provider = admin 
+        holdingType = "Fungible" 
+        holdingFactoryCid 
 
   let (instrumentId, instrumentVersion) = instrumentData
   now <- getTime

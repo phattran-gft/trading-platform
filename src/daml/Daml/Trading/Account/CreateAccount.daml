@@ -1,0 +1,121 @@
+module Daml.Trading.Account.CreateAccount where 
+
+import DA.Map qualified as M (fromList)
+import DA.Set qualified as S (fromList, singleton)
+import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (Create(..), F, Remove(..))
+import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
+import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
+
+-- to fetch the account factory for subsequent account creation
+template AccountFactoryReference 
+  with 
+    provider: Party 
+    accountFactoryCid: ContractId Account.F 
+  where 
+    signatory provider 
+    key provider: Party 
+    maintainer key 
+
+-- is this needed?
+template HoldingFactoryReference 
+  with 
+    provider: Party 
+    holdingType: Text 
+    holdingFactoryCid: ContractId Holding.F 
+  where 
+    signatory provider 
+    key (provider, holdingType): (Party, Text) 
+    maintainer key._1 
+
+template Request 
+  with 
+    custodian: Party 
+    owner: Party 
+  where 
+    signatory owner 
+    observer custodian 
+
+    choice Accept: AccountKey 
+      with 
+        label: Text 
+        description: Text 
+        accountFactoryCid: ContractId Account.F 
+        holdingFactoryCid: ContractId Holding.F 
+        observers: [Party] 
+        accountType: AccountType 
+        userName: Text 
+        realName: Text 
+        passportNumber: Text 
+        nationalId: Text 
+        address: Text 
+      controller custodian 
+      do
+        let
+          observersSet = S.fromList $ map S.singleton observers
+          accountKey = AccountKey with custodian = custodian, owner = owner, id = Id label 
+
+        accountCid <- exercise accountFactoryCid Account.Create with
+          account = accountKey
+          description = description
+          holdingFactoryCid = holdingFactoryCid
+          observers = M.fromList [("AccountObservers", observersSet)]
+        
+        cashAccountCid <- create Account 
+          with 
+            accountKey 
+            accountType 
+            userName 
+            realName 
+            passportNumber 
+            nationalId 
+            address 
+
+        pure accountKey
+
+    choice Decline : ()
+      -- ^ Decline the request.
+      controller custodian
+      do pure ()
+
+    choice Withdraw : ()
+      -- ^ Withdraw the request.
+      controller owner
+      do pure ()
+
+template Account 
+  with 
+    accountKey: AccountKey 
+    accountType: AccountType 
+    userName: Text 
+    realName: Text 
+    passportNumber: Text 
+    nationalId: Text 
+    address: Text 
+  where 
+    signatory accountKey.custodian, accountKey.owner 
+    key accountKey: AccountKey
+    maintainer key.custodian 
+
+    choice Update_Permission: ContractId Account 
+      with 
+        newAccountType: AccountType 
+      controller accountKey.custodian 
+      do 
+        assertMsg ("New account type should be different from current one") (accountType /= newAccountType)
+        create this with accountType = newAccountType 
+    
+    choice Close_Account: () 
+      with 
+        accountFactoryCid: ContractId Account.F 
+      controller accountKey.owner 
+      do 
+        exercise accountFactoryCid Account.Remove with account = accountKey 
+        pure ()
+
+-- we use custodian Party as admin for simplicity
+data AccountType 
+  = Admin 
+  | Retail 
+  | Pro 
+  deriving (Eq, Show)
+    
