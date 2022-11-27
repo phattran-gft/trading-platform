@@ -1,4 +1,4 @@
-module Daml.Trading.Account.CreateAccount where 
+module Daml.Trading.Account.Account where 
 
 import DA.Map qualified as M (fromList)
 import DA.Set qualified as S (fromList, singleton)
