@@ -4,7 +4,7 @@ import Daml.Script
 
 import Daml.Finance.Interface.Types.Common (Id(..), InstrumentKey(..))
 
-import Daml.Trading.Cash.CreateCashAccount qualified as CreateCashAccount
+import Daml.Trading.Account.CreateAccount qualified as CreateAccount
 import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
 import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
@@ -15,33 +15,65 @@ setup = do
   (public, admin, cashInstrument, accountFactoryCid, holdingFactoryCid) <- CashSetup.initialize 
   [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
 
+  adminRequestCid <- submit admin do 
+    createCmd CreateAccount.Request 
+      with 
+        owner = admin 
+        custodian = admin 
+  adminAccount <- submit admin do 
+    exerciseCmd adminRequestCid CreateAccount.Accept 
+      with 
+        label = "Admin" 
+        description = "Admin Account" 
+        accountFactoryCid
+        holdingFactoryCid 
+        observers = [] 
+        accountType = CreateAccount.Admin 
+        userName = "admin" 
+        realName = "Platform Admin" 
+        passportNumber = "111111" 
+        nationalId = "" 
+        address  = "Unknown" 
+
   aliceRequestCid <- submit alice do
-    createCmd CreateCashAccount.Request
+    createCmd CreateAccount.Request
       with
         owner = alice
         custodian = admin
   aliceAccount <- submit admin do
-    exerciseCmd aliceRequestCid CreateCashAccount.Accept
+    exerciseCmd aliceRequestCid CreateAccount.Accept
       with
         label = "Alice@Admin"
         description = "Account of Alice at Admin"
         accountFactoryCid = accountFactoryCid
         holdingFactoryCid = holdingFactoryCid
         observers = []
+        accountType = CreateAccount.Retail 
+        userName = "alice" 
+        realName = "Alice Ackerson" 
+        passportNumber = "222222" 
+        nationalId = "" 
+        address  = "New York" 
 
   bobRequestCid <- submit bob do
-    createCmd CreateCashAccount.Request
+    createCmd CreateAccount.Request
       with
         owner = bob
         custodian = admin
   bobAccount <- submit admin do
-    exerciseCmd bobRequestCid CreateCashAccount.Accept
+    exerciseCmd bobRequestCid CreateAccount.Accept
       with
         label = "Bob@Admin"
         description = "Account of Bob at Admin"
         accountFactoryCid = accountFactoryCid
         holdingFactoryCid = holdingFactoryCid
         observers = [alice]
+        accountType = CreateAccount.Retail 
+        userName = "bob" 
+        realName = "Bob Bader" 
+        passportNumber = "" 
+        nationalId = "333333" 
+        address  = "Boston" 
 
   let (instrumentId, instrumentVersion) = CashSetup.instrumentData
 
