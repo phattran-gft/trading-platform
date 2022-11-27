@@ -13,7 +13,7 @@ import Daml.Finance.Holding.Account qualified as Account (Factory(..))
 import Daml.Finance.Holding.Fungible qualified as Fungible (Factory(..))
 import Daml.Finance.Instrument.Base.Instrument (Instrument(..))
 
-import Daml.Trading.Account.CreateAccount (AccountFactoryReference(..), HoldingFactoryReference(..))
+import Daml.Trading.Account.Account (AccountFactoryReference(..), HoldingFactoryReference(..))
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (getDefaultParties)
 
 instrumentData = (Id "USD", "0")

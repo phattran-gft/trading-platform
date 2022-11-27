@@ -4,7 +4,7 @@ import Daml.Script
 
 import Daml.Finance.Interface.Types.Common (Id(..), InstrumentKey(..))
 
-import Daml.Trading.Account.CreateAccount qualified as CreateAccount
+import Daml.Trading.Account.Account qualified as CreateAccount
 import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
 import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
