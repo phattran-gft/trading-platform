@@ -3,30 +3,35 @@ module Daml.Trading.Cash.CreditCashAccount where
 import Daml.Finance.Interface.Holding.Account qualified as Account (Credit(..), I, exerciseInterfaceByKey)
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K, qty)
-import Daml.Finance.Interface.Types.Common (AccountKey(..))
+import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
+
+import Daml.Trading.Account.Account (cashLabel)
 
 template Request
   with
-    account : AccountKey
+    owner: Party 
+    custodian: Party 
     instrument : Instrument.K
     amount : Decimal
   where
-    signatory account.owner
-    observer account.custodian
+    signatory owner
+    observer custodian
 
     ensure amount > 0.0
 
     choice Accept : ContractId Holding.I
-      controller account.custodian
+      controller custodian 
       do
-        Account.exerciseInterfaceByKey @Account.I account account.custodian Account.Credit
+        let 
+          accountKey = AccountKey with custodian, owner, id = Id cashLabel
+        Account.exerciseInterfaceByKey @Account.I accountKey custodian Account.Credit
           with
             quantity = Instrument.qty amount instrument
 
     choice Decline : ()
-      controller account.custodian
+      controller custodian
       do pure ()
 
     choice Withdraw : ()
-      controller account.owner
+      controller owner
       do pure ()

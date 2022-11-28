@@ -1,10 +1,14 @@
 module Daml.Trading.Account.Account where 
 
+import DA.Optional (whenSome, isNone)
 import DA.Map qualified as M (fromList)
 import DA.Set qualified as S (fromList, singleton)
 import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (Create(..), F, Remove(..))
 import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
 import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
+
+cashLabel = "Cash"
+nftLabel = "Nft"
 
 -- to fetch the account factory for subsequent account creation
 template AccountFactoryReference 
@@ -31,85 +35,118 @@ template Request
   with 
     custodian: Party 
     owner: Party 
-  where 
-    signatory owner 
-    observer custodian 
-
-    choice Accept: AccountKey 
-      with 
-        label: Text 
-        description: Text 
-        accountFactoryCid: ContractId Account.F 
-        holdingFactoryCid: ContractId Holding.F 
-        observers: [Party] 
-        accountType: AccountType 
-        userName: Text 
-        realName: Text 
-        passportNumber: Text 
-        nationalId: Text 
-        address: Text 
-      controller custodian 
-      do
-        let
-          observersSet = S.fromList $ map S.singleton observers
-          accountKey = AccountKey with custodian = custodian, owner = owner, id = Id label 
-
-        accountCid <- exercise accountFactoryCid Account.Create with
-          account = accountKey
-          description = description
-          holdingFactoryCid = holdingFactoryCid
-          observers = M.fromList [("AccountObservers", observersSet)]
-        
-        cashAccountCid <- create Account 
-          with 
-            accountKey 
-            accountType 
-            userName 
-            realName 
-            passportNumber 
-            nationalId 
-            address 
-
-        pure accountKey
-
-    choice Decline : ()
-      -- ^ Decline the request.
-      controller custodian
-      do pure ()
-
-    choice Withdraw : ()
-      -- ^ Withdraw the request.
-      controller owner
-      do pure ()
-
-template Account 
-  with 
-    accountKey: AccountKey 
     accountType: AccountType 
-    userName: Text 
+    username: Text 
     realName: Text 
     passportNumber: Text 
     nationalId: Text 
     address: Text 
   where 
-    signatory accountKey.custodian, accountKey.owner 
-    key accountKey: AccountKey
-    maintainer key.custodian 
+    signatory owner 
+    observer custodian 
+
+    choice Request_Accept: ContractId Account 
+      controller custodian 
+      do
+        create Account 
+          with 
+            custodian 
+            owner 
+            accountType 
+            username 
+            realName 
+            passportNumber 
+            nationalId 
+            address 
+            optCashAccount = None 
+            optNftAccount = None 
+
+    choice Request_Decline : ()
+      controller custodian
+      do pure ()
+
+    choice Request_Withdraw : ()
+      controller owner
+      do pure ()
+
+template Account 
+  with 
+    custodian: Party 
+    owner: Party 
+    accountType: AccountType 
+    username: Text 
+    realName: Text 
+    passportNumber: Text 
+    nationalId: Text 
+    address: Text 
+    optCashAccount: Optional (ContractId Account.F, ContractId Holding.F, AccountKey) 
+    optNftAccount: Optional (ContractId Account.F, ContractId Holding.F, AccountKey) 
+  where 
+    signatory custodian, owner 
+    key (custodian, owner): (Party, Party)
+    maintainer key._1 
 
     choice Update_Permission: ContractId Account 
       with 
         newAccountType: AccountType 
-      controller accountKey.custodian 
+      controller custodian 
       do 
         assertMsg ("New account type should be different from current one") (accountType /= newAccountType)
         create this with accountType = newAccountType 
     
-    choice Close_Account: () 
+    choice Create_Cash_Account: ContractId Account 
       with 
+        description: Text 
         accountFactoryCid: ContractId Account.F 
-      controller accountKey.owner 
+        holdingFactoryCid: ContractId Holding.F 
+        observers: [Party] 
+      controller custodian 
       do 
-        exercise accountFactoryCid Account.Remove with account = accountKey 
+        assertMsg ("User already has a cash account") (isNone optCashAccount) 
+
+        let
+          observersSet = S.fromList $ map S.singleton observers
+          accountKey = AccountKey with custodian = custodian, owner = owner, id = Id cashLabel 
+
+        exercise accountFactoryCid Account.Create with
+          account = accountKey
+          description = description
+          holdingFactoryCid = holdingFactoryCid
+          observers = M.fromList [("AccountObservers", observersSet)]
+        
+        create this with optCashAccount = Some (accountFactoryCid, holdingFactoryCid, accountKey)
+    
+    choice Create_Nft_Account: ContractId Account 
+      with 
+        description: Text 
+        accountFactoryCid: ContractId Account.F 
+        holdingFactoryCid: ContractId Holding.F 
+        observers: [Party] 
+      controller custodian 
+      do 
+        assertMsg ("User already has a nft account") (isNone optNftAccount) 
+
+        let
+          observersSet = S.fromList $ map S.singleton observers
+          accountKey = AccountKey with custodian = custodian, owner = owner, id = Id nftLabel 
+
+        exercise accountFactoryCid Account.Create with
+          account = accountKey
+          description = description
+          holdingFactoryCid = holdingFactoryCid
+          observers = M.fromList [("AccountObservers", observersSet)]
+        
+        create this with optNftAccount = Some (accountFactoryCid, holdingFactoryCid, accountKey)
+    
+    choice Close_Account: () 
+      controller owner 
+      do 
+        -- remove holdings?
+        -- remove all associated accounts
+        whenSome optCashAccount \(cashAccountFactoryCid, _, cashAccountKey) -> do 
+          exercise cashAccountFactoryCid Account.Remove with account = cashAccountKey 
+        whenSome optNftAccount \(nftAccountFactoryCid, _, nftAccountKey) -> do 
+          exercise nftAccountFactoryCid Account.Remove with account = nftAccountKey 
         pure ()
 
 -- we use custodian Party as admin for simplicity
