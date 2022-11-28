@@ -1,17 +1,12 @@
 module Daml.Trading.Cash.CashRedemption where 
 
--- import Daml.Finance.Interface.Holding.Account qualified as Account ( Debit(..), R)
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
-import Daml.Trading.Cash.CreateCashAccount qualified as CreateCashAccount
-import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (F)
-import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
-import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I)
-import Daml.Finance.Interface.Types.Common (InstrumentKey(..))
-import Daml.Trading.Scripts.CashSetup qualified as CashSetup (instrumentData) 
+import Daml.Finance.Interface.Types.Common (AccountKey, InstrumentKey(..))
 import Daml.Finance.Interface.Holding.Fungible (ArchiveFungible(ArchiveFungible))
-import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (Split(..), SplitResult(..))
+import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..))
 import Daml.Finance.Interface.Holding.Util (getAmount)
+import DA.Optional (fromSome)
 
 template SplitRequest
     with 
@@ -19,7 +14,7 @@ template SplitRequest
         amount: Decimal
     where
         signatory currentOwner
-        nonconsuming choice Split : [ContractId Fungible.I]
+        nonconsuming choice Split : ([ContractId Fungible.I], ContractId Fungible.I)
             with
                 holdingCid : ContractId Holding.I
             controller currentOwner
@@ -30,7 +25,9 @@ template SplitRequest
                 let 
                     fungibleCid : ContractId Fungible.I = coerceContractId holdingCid
                 Fungible.SplitResult{splitCids,rest} <- exercise fungibleCid Fungible.Split with amounts = [amount]
-                pure (splitCids)
+                let remaining = (coerceContractId (fromSome rest) : ContractId Fungible.I)
+                pure (splitCids,remaining)
+
 
 template WithdrawalRequest
     with
@@ -38,49 +35,32 @@ template WithdrawalRequest
         customer : Party
         holdingCid : ContractId Holding.I
         amount : Decimal
+        instrument: InstrumentKey
     where
         signatory customer
         observer operator
 
-        ensure amount > 0.0
-
-        choice Accept : ()
+        -- ensure amount > 0.0
+        choice Accept : ContractId Holding.I
             with
-                accountFactoryCid: ContractId Account.F 
-                holdingFactoryCid: ContractId Holding.F 
+                adminBurnAccount : AccountKey 
             controller operator
-            do
-                let
-                    (instrumentId, instrumentVersion) = CashSetup.instrumentData
-                    cashInstrument = InstrumentKey with issuer = operator; depository = operator; id = instrumentId; version = instrumentVersion
-
-                adminRequestCid <- create CreateCashAccount.Request
-                    with
-                        owner = operator
-                        custodian = operator
-                
-                adminBurnAccount <- exercise adminRequestCid CreateCashAccount.Accept
-                    with
-                        label = "Admin@Admin"
-                        description = "Account of AdminBurn"
-                        accountFactoryCid = accountFactoryCid
-                        holdingFactoryCid = holdingFactoryCid
-                        observers = [customer]
-                
-                -- TODO: Split funding before request
+            do    
+                -- DDP-19 Split funding before request
+                assertMsg "Amount must > 0" (amount > 0.0)
                 splitRequest <- create SplitRequest
                     with
                         currentOwner = customer
                         amount = amount
 
-                [burnCid] <- exercise splitRequest Split
+                ([burnCid],remaining) <- exercise splitRequest Split
                     with 
                         holdingCid = holdingCid
 
                 transferRequest <- create CashTransfer.Request
                     with
                         receiverAccount = adminBurnAccount
-                        instrument = cashInstrument
+                        instrument = instrument
                         amount = amount
                         currentOwner = customer
 
@@ -91,7 +71,11 @@ template WithdrawalRequest
                     with
                         holdingCid = newburnCid
                 exercise (coerceContractId adminBurnWallet : ContractId Fungible.I) ArchiveFungible
-                pure()
+                
+                let
+                    remainingCid : ContractId Holding.I = coerceContractId remaining
+                pure(remainingCid)
+                
 
         choice Decline : ()
             controller operator

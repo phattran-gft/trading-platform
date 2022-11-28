@@ -14,6 +14,21 @@ setup = do
     (public, admin, cashInstrument, accountFactoryCid, holdingFactoryCid) <- CashSetup.initialize 
     [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
 
+    adminRequestCid <- submit admin do 
+        createCmd CreateCashAccount.Request
+            with
+                owner = admin
+                custodian = admin
+                
+    adminBurnAccount <- submit admin do 
+        exerciseCmd adminRequestCid CreateCashAccount.Accept
+            with
+                label = "Admin@Admin"
+                description = "Account of Admin Burn"
+                accountFactoryCid = accountFactoryCid
+                holdingFactoryCid = holdingFactoryCid
+                observers = [public]
+
     aliceRequestCid <- submit alice do
         createCmd CreateCashAccount.Request
             with
@@ -45,10 +60,24 @@ setup = do
                 customer = alice
                 holdingCid = aliceHoldingCid
                 amount = 600.0
+                instrument = cashInstrument
 
-    submit admin do 
+    aliceHoldingCidRemain <- submit admin do 
         exerciseCmd aliceRequestWithdrawal CashRedemption.Accept
             with
-                accountFactoryCid = accountFactoryCid
-                holdingFactoryCid = holdingFactoryCid
+                adminBurnAccount = adminBurnAccount
+
+    aliceRequestWithdrawal2 <- submit alice do
+        createCmd CashRedemption.WithdrawalRequest
+            with 
+                operator = admin
+                customer = alice
+                holdingCid = aliceHoldingCidRemain
+                amount = 100.0
+                instrument = cashInstrument
+
+    submit admin do 
+        exerciseCmd aliceRequestWithdrawal2 CashRedemption.Accept
+            with
+                adminBurnAccount = adminBurnAccount
     pure()
