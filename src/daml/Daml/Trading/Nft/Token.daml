@@ -2,17 +2,29 @@ module Daml.Trading.Nft.Token where
 
 import Daml.Script
 
+data PictureType
+    = Portrait
+    | Landscape
+        deriving (Eq, Show)
+
+data Rarity 
+    = Common
+    | Rare
+    | Super_Rare
+        deriving (Eq, Show)
+
 template Token 
   with
+    pictureName : Text
     owner: Party 
     userAdmin: Party 
-    -- issued: Time 
+    issued: Time 
     lastPrice: Decimal 
     currency: Text 
     royaltyRate: Decimal 
-    pictureType: Text
-    rarity: Text
-    pictureDescription: Text 
+    pictureType: PictureType
+    rarity: Rarity
+    pictureDescription: Text
   where 
     signatory userAdmin 
     -- ensure userAdmin /= owner
@@ -41,14 +53,14 @@ template Token
 
 template TokenOffer 
     with 
+        pictureName : Text
         owner: Party 
         userAdmin: Party 
-        -- issued: Time 
         lastPrice: Decimal 
         currency: Text 
         royaltyRate: Decimal 
-        pictureType: Text
-        rarity: Text
+        pictureType: PictureType
+        rarity: Rarity
         pictureDescription: Text 
         newOwner: Party 
         price: Decimal
@@ -59,16 +71,22 @@ template TokenOffer
         choice AcceptOffer: ContractId Token
             controller owner
             do
+                time <- getTime
                 create Token 
                     with 
                         owner = newOwner 
                         lastPrice = price 
+                        issued = time
                         ..
                 -- return (newToken)
         choice Reject: ContractId Token 
             controller newOwner
-            do 
-                create Token with ..
+            do
+                time <- getTime
+                create Token
+                    with 
+                        issued = time
+                        ..
 
 
 setup : Script ()
@@ -77,18 +95,19 @@ setup = script do
     bob <- allocatePartyWithHint "Bob" (PartyIdHint "Bob")
     -- charlie <- allocatePartyWithHint "Charlie" (PartyIdHint "Charlie")
     userAdmin <- allocatePartyWithHint "UserAdmin" (PartyIdHint "UserAdmin") 
-    
+    today <- getTime
     createToken <- submit userAdmin do
         createCmd Token
             with
+                pictureName = "First Token"
                 owner = userAdmin 
                 userAdmin = userAdmin
-                -- issued: Time 
+                issued = today
                 lastPrice = 0.0
                 currency = "USD" 
                 royaltyRate = 0.02 
-                pictureType = "Person"
-                rarity = "Rare"
+                pictureType = Portrait
+                rarity = Rare
                 pictureDescription = "Test1"
     
     aliceToken <- submit userAdmin do 
@@ -100,4 +119,4 @@ setup = script do
     submit userAdmin do 
         exerciseCmd aliceToken AcceptOffer
 
-    return ()
+    pure ()
