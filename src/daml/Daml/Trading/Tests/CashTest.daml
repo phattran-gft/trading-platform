@@ -2,7 +2,7 @@ module Daml.Trading.Tests.CashTest where
 
 import Daml.Script 
 
-import Daml.Finance.Interface.Types.Common (Id(..), InstrumentKey(..))
+import Daml.Finance.Interface.Types.Common (InstrumentKey(..), AccountKey(..), Id(..))
 
 import Daml.Trading.Account.Account qualified as CreateAccount
 import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
@@ -10,9 +10,12 @@ import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
 import Daml.Trading.Scripts.CashSetup qualified as CashSetup (initialize, instrumentData) 
 
+cashLabel = "Cash"
+nftLabel = "Nft"
+
 setup: Script () 
 setup = do 
-  (public, admin, cashInstrument, accountFactoryCid, holdingFactoryCid) <- CashSetup.initialize 
+  (public, admin, cashInstrument, accountFactoryCid, cashHoldingFactoryCid, nftHoldingFactoryCid) <- CashSetup.initialize 
   [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
 
   adminRequestCid <- submit admin do 
@@ -20,67 +23,74 @@ setup = do
       with 
         owner = admin 
         custodian = admin 
-  adminAccount <- submit admin do 
-    exerciseCmd adminRequestCid CreateAccount.Accept 
-      with 
-        label = "Admin" 
-        description = "Admin Account" 
-        accountFactoryCid
-        holdingFactoryCid 
-        observers = [] 
         accountType = CreateAccount.Admin 
-        userName = "admin" 
+        username = "admin" 
         realName = "Platform Admin" 
         passportNumber = "111111" 
         nationalId = "" 
         address  = "Unknown" 
+  adminAccountCid <- submit admin $ exerciseCmd adminRequestCid CreateAccount.Request_Accept 
+  adminAccountCid <- submit admin $ exerciseCmd adminAccountCid CreateAccount.Create_Cash_Account 
+    with 
+      description = "Admin Cash Account" 
+      accountFactoryCid
+      holdingFactoryCid = cashHoldingFactoryCid
+      observers = [] 
+  adminAccountCid <- submit admin $ exerciseCmd adminAccountCid CreateAccount.Create_Nft_Account 
+    with 
+      description = "Admin Nft Account" 
+      accountFactoryCid
+      holdingFactoryCid = cashHoldingFactoryCid
+      observers = [] 
 
   aliceRequestCid <- submit alice do
     createCmd CreateAccount.Request
       with
         owner = alice
         custodian = admin
-  aliceAccount <- submit admin do
-    exerciseCmd aliceRequestCid CreateAccount.Accept
-      with
-        label = "Alice@Admin"
-        description = "Account of Alice at Admin"
-        accountFactoryCid = accountFactoryCid
-        holdingFactoryCid = holdingFactoryCid
-        observers = []
         accountType = CreateAccount.Retail 
-        userName = "alice" 
+        username = "alice" 
         realName = "Alice Ackerson" 
         passportNumber = "222222" 
         nationalId = "" 
         address  = "New York" 
+  aliceAccountCid <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
+  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid CreateAccount.Create_Cash_Account 
+    with 
+      description = "Alice Cash Account"
+      accountFactoryCid = accountFactoryCid
+      holdingFactoryCid = cashHoldingFactoryCid
+      observers = []
 
   bobRequestCid <- submit bob do
     createCmd CreateAccount.Request
       with
         owner = bob
         custodian = admin
-  bobAccount <- submit admin do
-    exerciseCmd bobRequestCid CreateAccount.Accept
-      with
-        label = "Bob@Admin"
-        description = "Account of Bob at Admin"
-        accountFactoryCid = accountFactoryCid
-        holdingFactoryCid = holdingFactoryCid
-        observers = [alice]
         accountType = CreateAccount.Retail 
-        userName = "bob" 
+        username = "bob" 
         realName = "Bob Bader" 
         passportNumber = "" 
         nationalId = "333333" 
         address  = "Boston" 
+  bobAccountCid <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
+  bobAccountCid <- submit admin $ exerciseCmd bobAccountCid CreateAccount.Create_Cash_Account 
+    with 
+      description = "Bob Cash Account"
+      accountFactoryCid = accountFactoryCid
+      holdingFactoryCid = cashHoldingFactoryCid
+      observers = [alice]
 
-  let (instrumentId, instrumentVersion) = CashSetup.instrumentData
+  let 
+    (instrumentId, instrumentVersion) = CashSetup.instrumentData
+    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id cashLabel
+    bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id cashLabel
 
   aliceRequestCid <- submit alice do
     createCmd CreditCashAccount.Request
       with
-        account = aliceAccount
+        owner = alice
+        custodian = admin
         instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
         amount = 1000.0
 
@@ -89,7 +99,7 @@ setup = do
   transferRequestCid <- submit bob do
     createCmd CashTransfer.Request
       with
-        receiverAccount = bobAccount
+        receiverAccount = bobAccountKey
         instrument = cashInstrument
         amount = 1000.0
         currentOwner = alice

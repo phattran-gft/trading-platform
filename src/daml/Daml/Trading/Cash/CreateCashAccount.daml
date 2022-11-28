@@ -1,9 +1,9 @@
-module Daml.Trading.Nft.CreateNftAccount where 
+module Daml.Trading.Cash.CreateCashAccount where 
 
 import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (F)
 import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
 
-import Daml.Trading.Account.Account (Create_Nft_Account(..), Account)
+import Daml.Trading.Account.Account (Create_Cash_Account(..), Account)
 
 template Request 
   with 
@@ -22,4 +22,4 @@ template Request
       controller custodian 
       do 
         (accountCid, account) <- fetchByKey @Account (custodian, owner) 
-        exercise accountCid Create_Nft_Account with ..
+        exercise accountCid Create_Cash_Account with ..
