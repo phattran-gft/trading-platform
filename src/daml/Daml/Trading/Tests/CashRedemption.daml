@@ -38,18 +38,17 @@ setup = do
 
     aliceHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
 
-
     aliceRequestWithdrawal <- submit alice do
         createCmd CashRedemption.WithdrawalRequest
             with 
                 operator = admin
                 customer = alice
                 holdingCid = aliceHoldingCid
+                amount = 600.0
 
     submit admin do 
         exerciseCmd aliceRequestWithdrawal CashRedemption.Accept
             with
-                amount = 1000.0
                 accountFactoryCid = accountFactoryCid
                 holdingFactoryCid = holdingFactoryCid
     pure()

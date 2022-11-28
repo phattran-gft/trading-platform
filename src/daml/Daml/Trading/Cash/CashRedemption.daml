@@ -10,18 +10,42 @@ import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I)
 import Daml.Finance.Interface.Types.Common (InstrumentKey(..))
 import Daml.Trading.Scripts.CashSetup qualified as CashSetup (instrumentData) 
 import Daml.Finance.Interface.Holding.Fungible (ArchiveFungible(ArchiveFungible))
+import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (Split(..), SplitResult(..))
+import Daml.Finance.Interface.Holding.Util (getAmount)
+
+template SplitRequest
+    with 
+        currentOwner: Party
+        amount: Decimal
+    where
+        signatory currentOwner
+        nonconsuming choice Split : [ContractId Fungible.I]
+            with
+                holdingCid : ContractId Holding.I
+            controller currentOwner
+            do
+            -- Sanity checks
+                holding <- fetch holdingCid
+                assertMsg "Balance insufficient" (amount <= getAmount holding)
+                let 
+                    fungibleCid : ContractId Fungible.I = coerceContractId holdingCid
+                Fungible.SplitResult{splitCids,rest} <- exercise fungibleCid Fungible.Split with amounts = [amount]
+                pure (splitCids)
 
 template WithdrawalRequest
     with
         operator : Party
         customer : Party
         holdingCid : ContractId Holding.I
+        amount : Decimal
     where
         signatory customer
         observer operator
+
+        ensure amount > 0.0
+
         choice Accept : ()
             with
-                amount : Decimal
                 accountFactoryCid: ContractId Account.F 
                 holdingFactoryCid: ContractId Holding.F 
             controller operator
@@ -44,6 +68,14 @@ template WithdrawalRequest
                         observers = [customer]
                 
                 -- TODO: Split funding before request
+                splitRequest <- create SplitRequest
+                    with
+                        currentOwner = customer
+                        amount = amount
+
+                [burnCid] <- exercise splitRequest Split
+                    with 
+                        holdingCid = holdingCid
 
                 transferRequest <- create CashTransfer.Request
                     with
@@ -52,9 +84,12 @@ template WithdrawalRequest
                         amount = amount
                         currentOwner = customer
 
+                let
+                    newburnCid : ContractId Holding.I = coerceContractId burnCid
+
                 adminBurnWallet <- exercise transferRequest CashTransfer.Accept
                     with
-                        holdingCid = holdingCid
+                        holdingCid = newburnCid
                 exercise (coerceContractId adminBurnWallet : ContractId Fungible.I) ArchiveFungible
                 pure()
 
