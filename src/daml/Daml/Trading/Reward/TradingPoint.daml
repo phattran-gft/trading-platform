@@ -1,25 +1,164 @@
 module Daml.Trading.Reward.TradingPoint where 
 
+import Daml.Script
+                
+template Trade_Success
+    with
+        admin : Party
+        seller : Party
+        buyer : Party
+        tradeAmount : Decimal
+        asset : Text
+       
+    where 
+        signatory admin
+        observer seller, buyer
+        ensure seller /= buyer
+        choice IssueRewardPoint : (ContractId TradingPoint, ContractId TradingPoint)
+            controller admin
+            do  
+                (sellerTradingPointCid, sellerTradingPoint) <- fetchByKey @TradingPoint (admin, seller)
+                (buyerTradingPointCid, buyerTradingPoint) <- fetchByKey @TradingPoint (admin, buyer)
+                let 
+                    oldSellerTradingPoint = sellerTradingPoint.quantity
+                    oldBuyerTradingPoint = buyerTradingPoint.quantity
+
+                    oldSellerTradeAmountRemain = sellerTradingPoint.tradeAmountRemain
+                    oldBuyerTradeAmountRemain = buyerTradingPoint.tradeAmountRemain
+
+                    quantityPointBaseTradeAmount = truncate (tradeAmount / 500.0)
+                    tradeAmountRemainBaseTradeAmount = tradeAmount - intToDecimal(500 * truncate (tradeAmount / 500.0))
+                    
+                    newSellerTradeAmountRemain = tradeAmountRemainBaseTradeAmount + oldSellerTradeAmountRemain
+                    newBuyerTradeAmountRemain = tradeAmountRemainBaseTradeAmount + oldBuyerTradeAmountRemain
+                    
+                    sellerQuantityPointAfterCalAmountRemain = oldSellerTradingPoint + quantityPointBaseTradeAmount + truncate (newSellerTradeAmountRemain / 500.0) 
+                    buyerQuantityPointAfterCalAmountRemain = oldBuyerTradingPoint + quantityPointBaseTradeAmount + truncate (newBuyerTradeAmountRemain / 500.0)
+
+                    sellerQuantity = sellerQuantityPointAfterCalAmountRemain
+                    buyerQuantity = buyerQuantityPointAfterCalAmountRemain
+
+                    sellerAmountRemain = newSellerTradeAmountRemain - intToDecimal(500 * truncate (newSellerTradeAmountRemain / 500.0))
+                    buyerAmountRemain = newBuyerTradeAmountRemain - intToDecimal(500 * truncate (newBuyerTradeAmountRemain / 500.0))
+
+                archive buyerTradingPointCid
+                archive sellerTradingPointCid
+
+                seller <- create TradingPoint with 
+                    admin = admin
+                    holderRewardPoint = seller
+                    quantity = sellerQuantity
+                    tradeAmountRemain = sellerAmountRemain
+                buyer <- create TradingPoint with 
+                    admin = admin
+                    holderRewardPoint = buyer
+                    quantity = buyerQuantity
+                    tradeAmountRemain = buyerAmountRemain 
+
+                pure (seller, buyer)
+
+
 template TradingPoint
-  with
-    seller : Party
-    buyer : Party
-    description: Text
-    exchangeAdmin: Party
-    amount: Decimal
-    issued: Time 
-    lastPrice: Decimal 
-    currency: Text
-    royaltyRate: Decimal
-  where
-    signatory seller, buyer
-    ensure seller /= buyer
-    observer exchangeAdmin
-    choice createBadge: ContractId createBadge
-        with
-            tradingpoints: ContractId TradingOffer
-        controller exchangeAdmin
-        do
-            tradingpoint <- fetch tradingpoints
-            getAmount tradingpoint === amount
-            create createBadge with ..
+    with
+        admin : Party
+        holderRewardPoint : Party
+        quantity : Int
+        tradeAmountRemain : Decimal
+    where
+        signatory admin
+        observer holderRewardPoint
+        key (admin, holderRewardPoint) : (Party, Party)
+        maintainer key._1
+
+
+setup : Script()
+
+setup = script do
+    admin <- allocateParty "Admin"
+    alice <- allocateParty "Alice"
+    bob <- allocateParty "Bob"
+    charlie <- allocateParty "Charlie"
+
+    aliceTradingPoint <- submit admin do
+        createCmd TradingPoint with
+            admin = admin 
+            holderRewardPoint = alice
+            quantity = 0
+            tradeAmountRemain = 0.0
+
+    bobTradingPoint <- submit admin do
+        createCmd TradingPoint with
+            admin = admin 
+            holderRewardPoint = bob
+            quantity = 0
+            tradeAmountRemain = 0.0
+
+    charlieTradingPoint <- submit admin do
+        createCmd TradingPoint with
+            admin = admin 
+            holderRewardPoint = charlie
+            quantity = 0
+            tradeAmountRemain = 0.0
+    -- let
+    --     aliceTradingPointKey = (admin, alice)
+    --     bobTradingPointKey = (admin, bob)
+    --     charlieTradingPointKey = (admin, charlie)
+
+    trade_alice_charlie0 <- submit admin do
+        createCmd Trade_Success with
+            admin = admin
+            seller = charlie
+            buyer = alice
+            tradeAmount = 1400.0
+            asset = "USDT"
+
+    submit admin do
+        exerciseCmd trade_alice_charlie0 IssueRewardPoint
+
+    trade_bob_alice0 <- submit admin do
+        createCmd Trade_Success with
+            admin = admin
+            seller = alice
+            buyer = bob
+            tradeAmount = 600.0
+            asset = "BNB"
+
+    submit admin do
+        exerciseCmd trade_bob_alice0 IssueRewardPoint
+
+    trade_bob_alice1 <- submit admin do
+        createCmd Trade_Success with
+            admin = admin
+            seller = alice
+            buyer = bob
+            tradeAmount = 600.0
+            asset = "BNB"
+
+    (issue_bob2, issue_alice3) <- submit admin do
+        exerciseCmd trade_bob_alice1 IssueRewardPoint
+
+    trade_bob_alice1 <- submit admin do
+        createCmd Trade_Success with
+            admin = admin
+            seller = alice
+            buyer = bob
+            tradeAmount = 500.0
+            asset = "BNB"
+
+    (issue_bob2, issue_alice3) <- submit admin do
+        exerciseCmd trade_bob_alice1 IssueRewardPoint  
+
+    trade_charlie_alice0 <- submit admin do
+        createCmd Trade_Success with
+            admin = admin
+            seller = alice
+            buyer = charlie
+            tradeAmount = 800.0
+            asset = "BNB"
+
+    (issue_charlie2, issue_alice4) <- submit admin do
+        exerciseCmd trade_charlie_alice0 IssueRewardPoint  
+
+
+    pure()
+    

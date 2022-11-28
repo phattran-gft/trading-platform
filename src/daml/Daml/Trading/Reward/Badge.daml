@@ -1,1 +1,26 @@
 module Daml.Trading.Reward.Badge where 
+
+import Daml.Script
+
+template Badge
+    with 
+        issuer: Party 
+        user: Party 
+        name: Text
+    where 
+        signatory issuer
+        ensure name /= ""
+
+setup: Script(ContractId Badge)
+
+setup = script do
+    alice <- allocatePartyWithHint "Alice" (PartyIdHint "Alice")
+    bob <- allocatePartyWithHint "Bob" (PartyIdHint "Bob")
+    userAdmin <- allocatePartyWithHint "UserAdmin" (PartyIdHint "UserAdmin") 
+        
+    submit userAdmin do
+        createCmd Badge
+            with 
+                issuer = userAdmin
+                user = bob
+                name = "Gold"
