@@ -38,19 +38,6 @@ setup = do
 
     aliceHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
 
-    adminRequestCid <- submit admin do
-        createCmd CreateCashAccount.Request
-            with
-                owner = admin
-                custodian = admin
-    adminAccount <- submit admin do
-        exerciseCmd adminRequestCid CreateCashAccount.Accept
-            with
-                label = "Admin@Admin"
-                description = "Account of Admin"
-                accountFactoryCid = accountFactoryCid
-                holdingFactoryCid = holdingFactoryCid
-                observers = [alice]
 
     aliceRequestWithdrawal <- submit alice do
         createCmd CashRedemption.WithdrawalRequest
@@ -62,6 +49,7 @@ setup = do
     submit admin do 
         exerciseCmd aliceRequestWithdrawal CashRedemption.Accept
             with
-                adminWallet = adminAccount
                 amount = 1000.0
+                accountFactoryCid = accountFactoryCid
+                holdingFactoryCid = holdingFactoryCid
     pure()

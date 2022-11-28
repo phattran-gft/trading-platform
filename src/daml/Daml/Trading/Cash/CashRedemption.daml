@@ -3,8 +3,13 @@ module Daml.Trading.Cash.CashRedemption where
 -- import Daml.Finance.Interface.Holding.Account qualified as Account ( Debit(..), R)
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
-import Daml.Finance.Interface.Types.Common (InstrumentKey(..),AccountKey(..))
+import Daml.Trading.Cash.CreateCashAccount qualified as CreateCashAccount
+import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (F)
+import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
+import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I)
+import Daml.Finance.Interface.Types.Common (InstrumentKey(..))
 import Daml.Trading.Scripts.CashSetup qualified as CashSetup (instrumentData) 
+import Daml.Finance.Interface.Holding.Fungible (ArchiveFungible(ArchiveFungible))
 
 template WithdrawalRequest
     with
@@ -16,26 +21,41 @@ template WithdrawalRequest
         observer operator
         choice Accept : ()
             with
-                adminWallet : AccountKey
                 amount : Decimal
+                accountFactoryCid: ContractId Account.F 
+                holdingFactoryCid: ContractId Holding.F 
             controller operator
             do
                 let
                     (instrumentId, instrumentVersion) = CashSetup.instrumentData
                     cashInstrument = InstrumentKey with issuer = operator; depository = operator; id = instrumentId; version = instrumentVersion
+
+                adminRequestCid <- create CreateCashAccount.Request
+                    with
+                        owner = operator
+                        custodian = operator
+                
+                adminBurnAccount <- exercise adminRequestCid CreateCashAccount.Accept
+                    with
+                        label = "Admin@Admin"
+                        description = "Account of AdminBurn"
+                        accountFactoryCid = accountFactoryCid
+                        holdingFactoryCid = holdingFactoryCid
+                        observers = [customer]
+                
+                -- TODO: Split funding before request
+
                 transferRequest <- create CashTransfer.Request
                     with
-                        receiverAccount = adminWallet
+                        receiverAccount = adminBurnAccount
                         instrument = cashInstrument
                         amount = amount
                         currentOwner = customer
 
-                adminWallet <- exercise transferRequest CashTransfer.Accept
+                adminBurnWallet <- exercise transferRequest CashTransfer.Accept
                     with
                         holdingCid = holdingCid
-                -- TODO archive adminWallet
-                -- archive adminWallet
-            
+                exercise (coerceContractId adminBurnWallet : ContractId Fungible.I) ArchiveFungible
                 pure()
 
         choice Decline : ()
