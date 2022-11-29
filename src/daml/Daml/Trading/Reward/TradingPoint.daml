@@ -1,1 +1,72 @@
 module Daml.Trading.Reward.TradingPoint where 
+
+template TradeSuccess
+  with
+    admin : Party
+    seller : Party
+    buyer : Party
+    tradeAmount : Decimal
+    asset : Text
+  where 
+    signatory admin
+    observer seller, buyer
+    ensure seller /= buyer
+    choice IssueRewardPoint : (ContractId TradingPoint, ContractId TradingPoint)
+      controller admin
+      do  
+        (sellerTradingPointCid, sellerTradingPoint) <- fetchByKey @TradingPoint (admin, seller)
+        (buyerTradingPointCid, buyerTradingPoint) <- fetchByKey @TradingPoint (admin, buyer)
+        let    
+          calArguments : Decimal -> (Int, Decimal)
+          calArguments tradeAmount = (point, tradePointRemain)
+              where 
+                point = truncate (tradeAmount / 500.0) 
+                tradePointRemain = tradeAmount - intToDecimal(500 * point)
+                  
+          oldSellerTradingPoint = sellerTradingPoint.quantity
+          oldBuyerTradingPoint = buyerTradingPoint.quantity
+          oldSellerTradeAmountRemain = sellerTradingPoint.tradeAmountRemain
+          oldBuyerTradeAmountRemain = buyerTradingPoint.tradeAmountRemain
+          (quantityPointBaseTradeAmount, tradeAmountRemainBaseTradeAmount) = calArguments tradeAmount
+          
+          newSellerTradeAmountRemain = tradeAmountRemainBaseTradeAmount + oldSellerTradeAmountRemain
+          newBuyerTradeAmountRemain = tradeAmountRemainBaseTradeAmount + oldBuyerTradeAmountRemain
+
+          (sellerPoint, tradeAmountRemainSeller) = calArguments newSellerTradeAmountRemain
+          (buyerPoint, tradeAmountRemainBuyer) = calArguments newBuyerTradeAmountRemain
+          sellerQuantityPointAfterCalAmountRemain = oldSellerTradingPoint + quantityPointBaseTradeAmount + sellerPoint
+          buyerQuantityPointAfterCalAmountRemain = oldBuyerTradingPoint + quantityPointBaseTradeAmount + buyerPoint
+
+          sellerRewardPoint = sellerQuantityPointAfterCalAmountRemain
+          buyerRewardPoint = buyerQuantityPointAfterCalAmountRemain
+          sellerAmountRemain = tradeAmountRemainSeller
+          buyerAmountRemain = tradeAmountRemainBuyer
+              
+        archive buyerTradingPointCid
+        archive sellerTradingPointCid
+
+        seller <- create TradingPoint with 
+            admin = admin
+            holderRewardPoint = seller
+            quantity = sellerRewardPoint
+            tradeAmountRemain = sellerAmountRemain
+        buyer <- create TradingPoint with 
+            admin = admin
+            holderRewardPoint = buyer
+            quantity = buyerRewardPoint
+            tradeAmountRemain = buyerAmountRemain 
+        pure (seller, buyer)
+
+template TradingPoint
+  with
+    admin : Party
+    holderRewardPoint : Party
+    quantity : Int
+    tradeAmountRemain : Decimal
+  where
+    signatory admin
+    observer holderRewardPoint
+    key (admin, holderRewardPoint) : (Party, Party)
+    maintainer key._1
+
+
