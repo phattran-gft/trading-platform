@@ -6,7 +6,6 @@ import Daml.Finance.Interface.Types.Common (AccountKey, InstrumentKey(..))
 import Daml.Finance.Interface.Holding.Fungible (ArchiveFungible(ArchiveFungible))
 import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..))
 import Daml.Finance.Interface.Holding.Util (getAmount)
-import DA.Optional (fromSome)
 
 template SplitRequest
     with 
@@ -14,7 +13,7 @@ template SplitRequest
         amount: Decimal
     where
         signatory currentOwner
-        nonconsuming choice Split : ([ContractId Fungible.I], ContractId Fungible.I)
+        nonconsuming choice Split : ([ContractId Fungible.I], Optional (ContractId Fungible.I))
             with
                 holdingCid : ContractId Holding.I
             controller currentOwner
@@ -25,8 +24,7 @@ template SplitRequest
                 let 
                     fungibleCid : ContractId Fungible.I = coerceContractId holdingCid
                 Fungible.SplitResult{splitCids,rest} <- exercise fungibleCid Fungible.Split with amounts = [amount]
-                let remaining = (coerceContractId (fromSome rest) : ContractId Fungible.I)
-                pure (splitCids,remaining)
+                pure (splitCids, rest)
 
 
 template WithdrawalRequest
@@ -40,20 +38,19 @@ template WithdrawalRequest
         signatory customer
         observer operator
 
-        -- ensure amount > 0.0
-        choice Accept : ContractId Holding.I
+        ensure amount > 0.0
+        choice Accept : Optional (ContractId Holding.I)
             with
                 adminBurnAccount : AccountKey 
             controller operator
             do    
                 -- DDP-19 Split funding before request
-                assertMsg "Amount must > 0" (amount > 0.0)
                 splitRequest <- create SplitRequest
                     with
                         currentOwner = customer
                         amount = amount
-
-                ([burnCid],remaining) <- exercise splitRequest Split
+                
+                ([burnCid],remainingOpt) <- exercise splitRequest Split
                     with 
                         holdingCid = holdingCid
 
@@ -71,11 +68,10 @@ template WithdrawalRequest
                     with
                         holdingCid = newburnCid
                 exercise (coerceContractId adminBurnWallet : ContractId Fungible.I) ArchiveFungible
-                
-                let
-                    remainingCid : ContractId Holding.I = coerceContractId remaining
+
+                -- if(Some a) => Some (coerceContractId a), else None
+                let remainingCid = coerceContractId  <$> remainingOpt
                 pure(remainingCid)
-                
 
         choice Decline : ()
             controller operator

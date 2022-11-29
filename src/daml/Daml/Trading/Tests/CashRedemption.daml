@@ -8,6 +8,7 @@ import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
 import Daml.Trading.Scripts.CashSetup qualified as CashSetup (initialize, instrumentData) 
 import Daml.Finance.Interface.Types.Common (InstrumentKey(..))
 import Daml.Trading.Cash.CashRedemption qualified as CashRedemption
+import DA.Optional (fromSome)
 
 setup: Script () 
 setup = do 
@@ -72,7 +73,7 @@ setup = do
             with 
                 operator = admin
                 customer = alice
-                holdingCid = aliceHoldingCidRemain
+                holdingCid = fromSome aliceHoldingCidRemain
                 amount = 100.0
                 instrument = cashInstrument
 
