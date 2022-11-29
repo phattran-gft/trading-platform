@@ -1,0 +1,56 @@
+module Daml.Trading.Tests.NFTTest where 
+
+import Daml.Script 
+
+import Daml.Finance.Interface.Types.Common (InstrumentKey(..))
+
+import Daml.Trading.Account.Account qualified as CreateAccount
+import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
+import Daml.Trading.Nft.Token qualified as Token
+import Daml.Trading.Scripts.NFTSetup qualified as NFTSetup
+
+cashLabel = "Cash"
+nftLabel = "Nft"
+
+setup: Script () 
+setup = do 
+  (public, admin, nftInstrument, accountFactoryCid, nftHoldingFactoryCid) <- NFTSetup.initialize 
+  [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
+  let
+    (instrumentId, instrumentVersion) = NFTSetup.instrumentData
+  adminRequestCid <- submit admin do 
+    createCmd CreateAccount.Request 
+      with 
+        owner = admin 
+        custodian = admin 
+        accountType = CreateAccount.Admin 
+        username = "admin" 
+        realName = "Platform Admin" 
+        passportNumber = "111111" 
+        nationalId = "" 
+        address  = "Unknown" 
+  adminAccountCid <- submit admin $ exerciseCmd adminRequestCid CreateAccount.Request_Accept 
+  adminAccountCid <- submit admin $ exerciseCmd adminAccountCid CreateAccount.Create_Nft_Account 
+    with 
+      description = "Admin Nft Account" 
+      accountFactoryCid
+      holdingFactoryCid = nftHoldingFactoryCid
+      observers = [] 
+  now <- getTime
+  adminRequestIsussanceCid <- submit admin do
+    createCmd Token.Request
+      with
+        owner = admin
+        custodian = admin
+        userAdmin = admin
+        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
+        pictureName = "Test1"
+        issued = now 
+        lastPrice = 0.0
+        royaltyRate = 0.0
+        pictureType = Token.Landscape
+        rarity = Token.Rare
+        pictureDescription = ""
+  submit admin do
+    exerciseCmd adminRequestIsussanceCid Token.Accept
+  pure ()

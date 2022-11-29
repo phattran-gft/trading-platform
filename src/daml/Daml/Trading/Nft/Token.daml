@@ -1,6 +1,10 @@
 module Daml.Trading.Nft.Token where
 
-import Daml.Script
+import Daml.Finance.Interface.Holding.Account qualified as Account (Credit(..), I, exerciseInterfaceByKey)
+import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
+import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K, qty)
+import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
+import Daml.Trading.Account.Account (nftLabel)
 
 data PictureType
     = Portrait
@@ -13,110 +17,39 @@ data Rarity
     | Super_Rare
         deriving (Eq, Show)
 
-template Token 
+template Request
   with
-    pictureName : Text
     owner: Party 
+    custodian: Party 
     userAdmin: Party 
+    instrument : Instrument.K
+    pictureName : Text
     issued: Time 
     lastPrice: Decimal 
-    currency: Text 
     royaltyRate: Decimal 
     pictureType: PictureType
     rarity: Rarity
     pictureDescription: Text
-  where 
-    signatory userAdmin 
-    -- ensure userAdmin /= owner
-    choice Issuance: ContractId TokenOffer
-        with 
-          originalOwner: Party
-          originalPrice: Decimal
-        controller userAdmin
-        do 
-          create TokenOffer with
-            newOwner = originalOwner
-            price = originalPrice
-            ..
-
-    choice Offer: ContractId TokenOffer
-        with 
-            newOwner: Party 
-            newprice: Decimal 
-        controller userAdmin
-        do 
-            create TokenOffer with
-                owner = newOwner
-                price = newprice
-                ..
+  where
+    signatory owner
+    observer custodian
 
 
-template TokenOffer 
-    with 
-        pictureName : Text
-        owner: Party 
-        userAdmin: Party 
-        lastPrice: Decimal 
-        currency: Text 
-        royaltyRate: Decimal 
-        pictureType: PictureType
-        rarity: Rarity
-        pictureDescription: Text 
-        newOwner: Party 
-        price: Decimal
-    where
-        signatory owner, userAdmin 
-        observer newOwner
+    choice Accept : ContractId Holding.I
+      controller custodian 
+      do
+        let 
+          accountKey = AccountKey with custodian, owner, id = Id nftLabel
+          amount = 1.0
+        Account.exerciseInterfaceByKey @Account.I accountKey custodian Account.Credit
+          with
+            quantity = Instrument.qty amount instrument
 
-        choice AcceptOffer: ContractId Token
-            controller owner
-            do
-                time <- getTime
-                create Token 
-                    with 
-                        owner = newOwner 
-                        lastPrice = price 
-                        issued = time
-                        ..
-                -- return (newToken)
-        choice Reject: ContractId Token 
-            controller newOwner
-            do
-                time <- getTime
-                create Token
-                    with 
-                        issued = time
-                        ..
+    choice Decline : ()
+      controller custodian
+      do pure ()
 
+    choice Withdraw : ()
+      controller owner
+      do pure ()
 
-setup : Script ()
-setup = script do
-    alice <- allocatePartyWithHint "Alice" (PartyIdHint "Alice")
-    bob <- allocatePartyWithHint "Bob" (PartyIdHint "Bob")
-    -- charlie <- allocatePartyWithHint "Charlie" (PartyIdHint "Charlie")
-    userAdmin <- allocatePartyWithHint "UserAdmin" (PartyIdHint "UserAdmin") 
-    today <- getTime
-    createToken <- submit userAdmin do
-        createCmd Token
-            with
-                pictureName = "First Token"
-                owner = userAdmin 
-                userAdmin = userAdmin
-                issued = today
-                lastPrice = 0.0
-                currency = "USD" 
-                royaltyRate = 0.02 
-                pictureType = Portrait
-                rarity = Rare
-                pictureDescription = "Test1"
-    
-    aliceToken <- submit userAdmin do 
-        exerciseCmd createToken Issuance
-            with
-                originalOwner = alice
-                originalPrice = 1000.0
-
-    submit userAdmin do 
-        exerciseCmd aliceToken AcceptOffer
-
-    pure ()
