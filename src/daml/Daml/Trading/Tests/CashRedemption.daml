@@ -10,75 +10,75 @@ import Daml.Finance.Interface.Types.Common (InstrumentKey(..))
 import Daml.Trading.Cash.CashRedemption qualified as CashRedemption
 import DA.Optional (fromSome)
 
-setup: Script () 
+setup: Script ()
 setup = do 
-    (public, admin, cashInstrument, accountFactoryCid, holdingFactoryCid) <- CashSetup.initialize 
-    [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
+  (public, admin, cashInstrument, accountFactoryCid, holdingFactoryCid) <- CashSetup.initialize 
+  [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
 
-    adminRequestCid <- submit admin do 
-        createCmd CreateCashAccount.Request
-            with
-                owner = admin
-                custodian = admin
-                
-    adminBurnAccount <- submit admin do 
-        exerciseCmd adminRequestCid CreateCashAccount.Accept
-            with
-                label = "Admin@Admin"
-                description = "Account of Admin Burn"
-                accountFactoryCid = accountFactoryCid
-                holdingFactoryCid = holdingFactoryCid
-                observers = [public]
+  adminRequestCid <- submit admin do 
+    createCmd CreateCashAccount.Request
+      with
+        owner = admin
+        custodian = admin
+              
+  adminBurnAccount <- submit admin do 
+    exerciseCmd adminRequestCid CreateCashAccount.Accept
+      with
+        label = "Admin@Admin"
+        description = "Account of Admin Burn"
+        accountFactoryCid = accountFactoryCid
+        holdingFactoryCid = holdingFactoryCid
+        observers = [public]
 
-    aliceRequestCid <- submit alice do
-        createCmd CreateCashAccount.Request
-            with
-                owner = alice
-                custodian = admin
-    aliceAccount <- submit admin do
-        exerciseCmd aliceRequestCid CreateCashAccount.Accept
-            with
-                label = "Alice@Admin"
-                description = "Account of Alice at Admin"
-                accountFactoryCid = accountFactoryCid
-                holdingFactoryCid = holdingFactoryCid
-                observers = []
-    let (instrumentId, instrumentVersion) = CashSetup.instrumentData
+  aliceRequestCid <- submit alice do
+    createCmd CreateCashAccount.Request
+      with
+        owner = alice
+        custodian = admin
+  aliceAccount <- submit admin do
+    exerciseCmd aliceRequestCid CreateCashAccount.Accept
+      with
+        label = "Alice@Admin"
+        description = "Account of Alice at Admin"
+        accountFactoryCid = accountFactoryCid
+        holdingFactoryCid = holdingFactoryCid
+        observers = []
+  let (instrumentId, instrumentVersion) = CashSetup.instrumentData
 
-    aliceRequestCid <- submit alice do
-        createCmd CreditCashAccount.Request
-            with
-                account = aliceAccount
-                instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
-                amount = 1000.0
+  aliceRequestCid <- submit alice do
+    createCmd CreditCashAccount.Request
+      with
+        account = aliceAccount
+        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
+        amount = 1000.0
 
-    aliceHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
+  aliceHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
 
-    aliceRequestWithdrawal <- submit alice do
-        createCmd CashRedemption.WithdrawalRequest
-            with 
-                operator = admin
-                customer = alice
-                holdingCid = aliceHoldingCid
-                amount = 600.0
-                instrument = cashInstrument
+  aliceRequestWithdrawal <- submit alice do
+    createCmd CashRedemption.WithdrawalRequest
+      with 
+        operator = admin
+        customer = alice
+        holdingCid = aliceHoldingCid
+        amount = 600.0
+        instrument = cashInstrument
 
-    aliceHoldingCidRemain <- submit admin do 
-        exerciseCmd aliceRequestWithdrawal CashRedemption.Accept
-            with
-                adminBurnAccount = adminBurnAccount
+  aliceHoldingCidRemain <- submit admin do 
+    exerciseCmd aliceRequestWithdrawal CashRedemption.Accept
+      with
+        adminBurnAccount = adminBurnAccount
 
-    aliceRequestWithdrawal2 <- submit alice do
-        createCmd CashRedemption.WithdrawalRequest
-            with 
-                operator = admin
-                customer = alice
-                holdingCid = fromSome aliceHoldingCidRemain
-                amount = 100.0
-                instrument = cashInstrument
+  aliceRequestWithdrawal2 <- submit alice do
+    createCmd CashRedemption.WithdrawalRequest
+      with 
+        operator = admin
+        customer = alice
+        holdingCid = fromSome aliceHoldingCidRemain
+        amount = 100.0
+        instrument = cashInstrument
 
-    submit admin do 
-        exerciseCmd aliceRequestWithdrawal2 CashRedemption.Accept
-            with
-                adminBurnAccount = adminBurnAccount
-    pure()
+  submit admin do 
+    exerciseCmd aliceRequestWithdrawal2 CashRedemption.Accept
+      with
+        adminBurnAccount = adminBurnAccount
+  pure()
