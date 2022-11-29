@@ -1,0 +1,82 @@
+module Daml.Trading.Cash.CashRedemption where
+
+import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
+import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
+import Daml.Finance.Interface.Types.Common (AccountKey, InstrumentKey(..))
+import Daml.Finance.Interface.Holding.Fungible (ArchiveFungible(ArchiveFungible))
+import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..))
+import Daml.Finance.Interface.Holding.Util (getAmount)
+
+template SplitRequest
+  with
+    currentOwner: Party
+    amount: Decimal
+  where
+    signatory currentOwner
+    nonconsuming choice Split : ([ContractId Fungible.I], Optional (ContractId Fungible.I))
+      with
+        holdingCid : ContractId Holding.I
+      controller currentOwner
+      do
+      -- Sanity checks
+        holding <- fetch holdingCid
+        assertMsg "Balance insufficient" (amount <= getAmount holding)
+        let
+          fungibleCid : ContractId Fungible.I = coerceContractId holdingCid
+        Fungible.SplitResult{splitCids,rest} <- exercise fungibleCid Fungible.Split with amounts = [amount]
+        pure (splitCids, rest)
+
+
+template WithdrawalRequest
+  with
+    operator : Party
+    customer : Party
+    holdingCid : ContractId Holding.I
+    amount : Decimal
+    instrument: InstrumentKey
+  where
+    signatory customer
+    observer operator
+
+    ensure amount > 0.0
+    choice Accept : Optional (ContractId Holding.I)
+      with
+        adminBurnAccount : AccountKey
+      controller operator
+      do
+        -- DDP-19 Split funding before request
+        splitRequest <- create SplitRequest
+          with
+            currentOwner = customer
+            amount = amount
+
+        ([burnCid],remainingOpt) <- exercise splitRequest Split
+          with
+            holdingCid = holdingCid
+
+        transferRequest <- create CashTransfer.Request
+          with
+            receiverAccount = adminBurnAccount
+            instrument = instrument
+            amount = amount
+            currentOwner = customer
+
+        let
+          newburnCid : ContractId Holding.I = coerceContractId burnCid
+
+        adminBurnWallet <- exercise transferRequest CashTransfer.Accept
+          with
+            holdingCid = newburnCid
+        exercise (coerceContractId adminBurnWallet : ContractId Fungible.I) ArchiveFungible
+
+        -- if(Some a) => Some (coerceContractId a), else None
+        let remainingCid = coerceContractId  <$> remainingOpt
+        pure(remainingCid)
+
+    choice Decline : ()
+      controller operator
+      do pure ()
+
+    choice Cancel : ()
+      controller customer
+      do pure ()
