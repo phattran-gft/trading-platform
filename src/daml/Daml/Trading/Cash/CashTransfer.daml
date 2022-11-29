@@ -3,7 +3,7 @@ module Daml.Trading.Cash.CashTransfer where
 import DA.Assert ((===))
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Holding.Transferable qualified as Transferable (I, Transfer(..))
-import Daml.Finance.Interface.Holding.Util (getAmount, getInstrument)
+import Daml.Finance.Interface.Holding.Util (getInstrument)
 import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K)
 import Daml.Finance.Interface.Types.Common (AccountKey(..))
 
@@ -25,7 +25,6 @@ template Request
       controller currentOwner
       do
         holding <- fetch holdingCid
-        getAmount holding === amount
         getInstrument holding === instrument
 
         let transferableCid : ContractId Transferable.I = coerceContractId holdingCid
