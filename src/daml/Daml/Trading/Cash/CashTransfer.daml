@@ -3,9 +3,11 @@ module Daml.Trading.Cash.CashTransfer where
 import DA.Assert ((===))
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Holding.Transferable qualified as Transferable (I, Transfer(..))
+import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..))
 import Daml.Finance.Interface.Holding.Util (getAmount, getInstrument)
 import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K)
 import Daml.Finance.Interface.Types.Common (AccountKey(..))
+import DA.List (head)
 
 template Request
   with
@@ -43,3 +45,21 @@ template Request
     choice Withdraw : ()
       controller receiverAccount.owner
       do pure ()
+
+template SplitRequest
+  with
+    currentOwner: Party
+    amount: Decimal
+  where
+    signatory currentOwner
+    nonconsuming choice Split : (ContractId Fungible.I, Optional (ContractId Fungible.I))
+      with
+        holdingCid : ContractId Holding.I
+      controller currentOwner
+      do
+        holding <- fetch holdingCid
+        assertMsg "Balance insufficient" (amount <= getAmount holding)
+        let
+          fungibleCid : ContractId Fungible.I = coerceContractId holdingCid
+        Fungible.SplitResult{splitCids,rest} <- exercise fungibleCid Fungible.Split with amounts = [amount]
+        pure (head (splitCids), rest)

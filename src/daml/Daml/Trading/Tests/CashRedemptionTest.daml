@@ -1,4 +1,4 @@
-module Daml.Trading.Tests.CashRedemption where
+module Daml.Trading.Tests.CashRedemptionTest where
 
 import Daml.Script
 
@@ -10,9 +10,6 @@ import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
 import Daml.Trading.Scripts.CashSetup qualified as CashSetup (initialize, instrumentData) 
 import Daml.Trading.Cash.CashRedemption qualified as CashRedemption
 import DA.Optional (fromSome)
-
-cashLabel = "Cash"
-nftLabel = "Nft"
 
 setup: Script ()
 setup = do 
@@ -58,8 +55,8 @@ setup = do
       observers = []
   let 
     (instrumentId, instrumentVersion) = CashSetup.instrumentData
-    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id cashLabel
-    adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id cashLabel
+    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id CreateAccount.cashLabel
+    adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id CreateAccount.cashLabel
   
   aliceRequestCid <- submit alice do
     createCmd CreditCashAccount.Request
@@ -74,30 +71,32 @@ setup = do
   aliceRequestWithdrawal <- submit alice do
     createCmd CashRedemption.WithdrawalRequest
       with 
-        operator = admin
-        customer = alice
+        custodian = admin
+        owner = alice
         holdingCid = aliceCashHoldingCid
         amount = 600.0
         instrument = cashInstrument
 
-  aliceHoldingCidRemain <- submit admin do 
+  aliceHoldingCidRemainOpt <- submit admin do 
     exerciseCmd aliceRequestWithdrawal CashRedemption.Accept
-      with
-        adminBurnAccount = adminAccountKey
+
+  let 
+    aliceHoldingCidRemain = fromSome aliceHoldingCidRemainOpt
 
   aliceRequestWithdrawal2 <- submit alice do
     createCmd CashRedemption.WithdrawalRequest
       with 
-        operator = admin
-        customer = alice
-        holdingCid = fromSome aliceHoldingCidRemain
+        custodian = admin
+        owner = alice
+        holdingCid = aliceHoldingCidRemain
         amount = 50.0
         instrument = cashInstrument
 
-  aliceCashHoldingCidremaining <- submit admin do 
+  aliceCashHoldingCidremainingOpt <- submit admin do 
     exerciseCmd aliceRequestWithdrawal2 CashRedemption.Accept
-      with
-        adminBurnAccount = adminAccountKey
+
+  let
+    aliceCashHoldingCidremaining = fromSome aliceCashHoldingCidremainingOpt
 
   bobRequestCid <- submit bob do
     createCmd CreateAccount.Request
@@ -118,7 +117,7 @@ setup = do
       holdingFactoryCid = cashHoldingFactoryCid
       observers = [alice]
   let
-    bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id cashLabel
+    bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id CreateAccount.cashLabel
   
   transferRequestCid <- submit bob do
     createCmd CashTransfer.Request
@@ -128,20 +127,18 @@ setup = do
         amount = 350.0
         currentOwner = alice
 
-  newbobHoldingCid <- submitMulti [alice] [public] do exerciseCmd transferRequestCid CashTransfer.Accept with holdingCid = fromSome aliceCashHoldingCidremaining
+  newbobHoldingCid <- submitMulti [alice] [public] do exerciseCmd transferRequestCid CashTransfer.Accept with holdingCid = aliceCashHoldingCidremaining
 
   bobRequestWithdrawal <- submit bob do
     createCmd CashRedemption.WithdrawalRequest
       with 
-        operator = admin
-        customer = bob
+        custodian = admin
+        owner = bob
         holdingCid = newbobHoldingCid
         amount = 150.0
         instrument = cashInstrument
 
   bobCashHoldingCidremaining <- submit admin do 
     exerciseCmd bobRequestWithdrawal CashRedemption.Accept
-      with
-        adminBurnAccount = adminAccountKey
   
   pure()
