@@ -101,8 +101,9 @@ setup = do
       with
         receiverAccount = bobAccountKey
         instrument = cashInstrument
-        amount = 1000.0
-        currentOwner = alice
+        amount = 800.0
+        owner = alice
+        custodian = admin
 
   newHoldingCid <- submitMulti [alice] [public] do exerciseCmd transferRequestCid CashTransfer.Accept with holdingCid = aliceCashHoldingCid
 

@@ -124,10 +124,14 @@ setup = do
       with
         receiverAccount = bobAccountKey
         instrument = cashInstrument
-        amount = 350.0
-        currentOwner = alice
+        amount = 330.0
+        owner = alice
+        custodian = admin
 
-  newbobHoldingCid <- submitMulti [alice] [public] do exerciseCmd transferRequestCid CashTransfer.Accept with holdingCid = aliceCashHoldingCidremaining
+  (newbobHoldingCid,newaliceRemainingCid) <- submitMulti [alice] [public] do
+    exerciseCmd transferRequestCid CashTransfer.Accept
+      with
+        holdingCid = aliceCashHoldingCidremaining
 
   bobRequestWithdrawal <- submit bob do
     createCmd CashRedemption.WithdrawalRequest
@@ -135,7 +139,7 @@ setup = do
         custodian = admin
         owner = bob
         holdingCid = newbobHoldingCid
-        amount = 150.0
+        amount = 130.0
         instrument = cashInstrument
 
   bobCashHoldingCidremaining <- submit admin do 
