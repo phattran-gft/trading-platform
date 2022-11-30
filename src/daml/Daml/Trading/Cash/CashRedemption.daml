@@ -22,16 +22,14 @@ template WithdrawalRequest
       controller custodian
       do
         let
-          adminBurnAccount = AccountKey with custodian = custodian, owner = owner, id = Id CreateAccount.cashLabel
-        
-        splitRequest <- create CashTransfer.SplitRequest
-          with
-            currentOwner = owner
-            amount = amount
+          adminBurnAccount = AccountKey with custodian = custodian, owner = custodian, id = Id CreateAccount.cashLabel
 
-        (burnCid,remainingOpt) <- exercise splitRequest CashTransfer.Split
+        (splitRequest,_) <- fetchByKey @CreateAccount.Account (custodian, owner)
+
+        (burnCid,remainingOpt) <- exercise splitRequest CreateAccount.Split
           with
             holdingCid = holdingCid
+            amount = amount
 
         transferRequest <- create CashTransfer.Request
           with
