@@ -8,14 +8,12 @@ import Daml.Trading.Account.Account qualified as CreateAccount
 import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
 import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
-import Daml.Trading.Scripts.CashSetup qualified as CashSetup (initialize, instrumentData) 
-
-cashLabel = "Cash"
-nftLabel = "Nft"
+import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (initialize, instrumentData) 
 
 setup: Script () 
 setup = do 
-  (public, admin, cashInstrument, accountFactoryCid, cashHoldingFactoryCid, nftHoldingFactoryCid) <- CashSetup.initialize 
+  (public, admin, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid) <- HoldingSetup.initialize 
   [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
 
   adminRequestCid <- submit admin do 
@@ -40,7 +38,8 @@ setup = do
     with 
       description = "Admin Nft Account" 
       accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid
+      holdingFactoryCid = nftHoldingFactoryCid
+      instrumentFactoryCid
       observers = [] 
 
   aliceRequestCid <- submit alice do
@@ -82,9 +81,9 @@ setup = do
       observers = [alice]
 
   let 
-    (instrumentId, instrumentVersion) = CashSetup.instrumentData
-    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id cashLabel
-    bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id cashLabel
+    (instrumentId, instrumentVersion) = HoldingSetup.instrumentData
+    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id CreateAccount.cashLabel
+    bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id CreateAccount.cashLabel
 
   aliceRequestCid <- submit alice do
     createCmd CreditCashAccount.Request

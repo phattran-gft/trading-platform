@@ -2,6 +2,7 @@ module Daml.Trading.Nft.CreateNftAccount where
 
 import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (F)
 import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
+import Daml.Finance.Interface.Instrument.Base.Factory qualified as Instrument (F)
 
 import Daml.Trading.Account.Account (Create_Nft_Account(..), Account)
 
@@ -18,6 +19,7 @@ template Request
         description: Text 
         accountFactoryCid: ContractId Account.F 
         holdingFactoryCid: ContractId Holding.F 
+        instrumentFactoryCid: ContractId Instrument.F 
         observers: [Party] 
       controller custodian 
       do 
