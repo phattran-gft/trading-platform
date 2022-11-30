@@ -29,7 +29,7 @@ template SplitRequest
 
 template WithdrawalRequest
   with
-    operator : Party
+    custodian : Party
     customer : Party
     holdingCid : ContractId Holding.I
     amount : Decimal
