@@ -1,0 +1,58 @@
+module Daml.Trading.Cash.CashRedemption where
+
+import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
+import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
+import Daml.Finance.Interface.Types.Common (AccountKey(..),Id(..), InstrumentKey(..))
+import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, ArchiveFungible(..))
+import Daml.Trading.Account.Account qualified as CreateAccount
+
+template WithdrawalRequest
+  with
+    custodian : Party
+    owner : Party
+    holdingCid : ContractId Holding.I
+    amount : Decimal
+    instrument: InstrumentKey
+  where
+    signatory owner
+    observer custodian
+
+    ensure amount > 0.0
+    choice Accept :  Optional (ContractId Holding.I)
+      controller custodian
+      do
+        let
+          adminBurnAccount = AccountKey with custodian = custodian, owner = custodian, id = Id CreateAccount.cashLabel
+
+        (accountCid,_) <- fetchByKey @CreateAccount.Account (custodian, owner)
+
+        (burnCid,remainingOpt) <- exercise accountCid CreateAccount.Split
+          with
+            holdingCid = holdingCid
+            amount = amount
+
+        transferRequest <- create CashTransfer.Request
+          with
+            receiverAccount = adminBurnAccount
+            instrument = instrument
+            amount = amount
+            currentOwner = owner
+
+        let
+          newburnCid : ContractId Holding.I = coerceContractId burnCid
+
+        adminHoldingCid <- exercise transferRequest CashTransfer.Accept
+          with
+            holdingCid = newburnCid
+        exercise (coerceContractId adminHoldingCid : ContractId Fungible.I) Fungible.ArchiveFungible
+
+        let remainingCid = coerceContractId  <$> remainingOpt
+        pure (remainingCid)
+
+    choice Decline : ()
+      controller custodian
+      do pure ()
+
+    choice Cancel : ()
+      controller owner
+      do pure ()
