@@ -24,9 +24,9 @@ template WithdrawalRequest
         let
           adminBurnAccount = AccountKey with custodian = custodian, owner = custodian, id = Id CreateAccount.cashLabel
 
-        (splitRequest,_) <- fetchByKey @CreateAccount.Account (custodian, owner)
+        (accountCid,_) <- fetchByKey @CreateAccount.Account (custodian, owner)
 
-        (burnCid,remainingOpt) <- exercise splitRequest CreateAccount.Split
+        (burnCid,remainingOpt) <- exercise accountCid CreateAccount.Split
           with
             holdingCid = holdingCid
             amount = amount
@@ -41,10 +41,10 @@ template WithdrawalRequest
         let
           newburnCid : ContractId Holding.I = coerceContractId burnCid
 
-        adminBurnWallet <- exercise transferRequest CashTransfer.Accept
+        adminHoldingCid <- exercise transferRequest CashTransfer.Accept
           with
             holdingCid = newburnCid
-        exercise (coerceContractId adminBurnWallet : ContractId Fungible.I) Fungible.ArchiveFungible
+        exercise (coerceContractId adminHoldingCid : ContractId Fungible.I) Fungible.ArchiveFungible
 
         let remainingCid = coerceContractId  <$> remainingOpt
         pure (remainingCid)
