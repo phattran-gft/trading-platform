@@ -1,5 +1,11 @@
 module Daml.Trading.Reward.TradingPoint where 
 
+calPointAndAmountRemain : Decimal -> (Int, Decimal)
+calPointAndAmountRemain tradeAmount = (point, tradePointRemain)
+  where 
+    point = truncate (tradeAmount / 500.0) 
+    tradePointRemain = tradeAmount - intToDecimal(500 * point)
+
 template TradeSuccess
   with
     admin : Party
@@ -16,24 +22,18 @@ template TradeSuccess
       do  
         (sellerTradingPointCid, sellerTradingPoint) <- fetchByKey @TradingPoint (admin, seller)
         (buyerTradingPointCid, buyerTradingPoint) <- fetchByKey @TradingPoint (admin, buyer)
-        let    
-          calArguments : Decimal -> (Int, Decimal)
-          calArguments tradeAmount = (point, tradePointRemain)
-              where 
-                point = truncate (tradeAmount / 500.0) 
-                tradePointRemain = tradeAmount - intToDecimal(500 * point)
-                  
+        let       
           oldSellerTradingPoint = sellerTradingPoint.quantity
           oldBuyerTradingPoint = buyerTradingPoint.quantity
           oldSellerTradeAmountRemain = sellerTradingPoint.tradeAmountRemain
           oldBuyerTradeAmountRemain = buyerTradingPoint.tradeAmountRemain
-          (quantityPointBaseTradeAmount, tradeAmountRemainBaseTradeAmount) = calArguments tradeAmount
+          (quantityPointBaseTradeAmount, tradeAmountRemainBaseTradeAmount) = calPointAndAmountRemain tradeAmount
           
           newSellerTradeAmountRemain = tradeAmountRemainBaseTradeAmount + oldSellerTradeAmountRemain
           newBuyerTradeAmountRemain = tradeAmountRemainBaseTradeAmount + oldBuyerTradeAmountRemain
 
-          (sellerPoint, tradeAmountRemainSeller) = calArguments newSellerTradeAmountRemain
-          (buyerPoint, tradeAmountRemainBuyer) = calArguments newBuyerTradeAmountRemain
+          (sellerPoint, tradeAmountRemainSeller) = calPointAndAmountRemain newSellerTradeAmountRemain
+          (buyerPoint, tradeAmountRemainBuyer) = calPointAndAmountRemain newBuyerTradeAmountRemain
           sellerQuantityPointAfterCalAmountRemain = oldSellerTradingPoint + quantityPointBaseTradeAmount + sellerPoint
           buyerQuantityPointAfterCalAmountRemain = oldBuyerTradingPoint + quantityPointBaseTradeAmount + buyerPoint
 
@@ -68,5 +68,6 @@ template TradingPoint
     observer holderRewardPoint
     key (admin, holderRewardPoint) : (Party, Party)
     maintainer key._1
+
 
 
