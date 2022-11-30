@@ -30,7 +30,7 @@ template SplitRequest
 template WithdrawalRequest
   with
     custodian : Party
-    customer : Party
+    owner : Party
     holdingCid : ContractId Holding.I
     amount : Decimal
     instrument: InstrumentKey
