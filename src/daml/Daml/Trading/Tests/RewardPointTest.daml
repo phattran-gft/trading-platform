@@ -1,0 +1,92 @@
+module Daml.Trading.Tests.RewardPointTest where
+
+import Daml.Script
+
+import Daml.Trading.Reward.TradingPoint qualified as Reward
+
+setup : Script()
+
+setup = script do
+    admin <- allocateParty "Admin"
+    alice <- allocateParty "Alice"
+    bob <- allocateParty "Bob"
+    charlie <- allocateParty "Charlie"
+
+    aliceTradingPoint <- submit admin do
+        createCmd Reward.TradingPoint with
+            admin = admin
+            holderRewardPoint = alice
+            quantity = 0
+            tradeAmountRemain = 0.0
+
+    bobTradingPoint <- submit admin do
+        createCmd Reward.TradingPoint with
+            admin = admin
+            holderRewardPoint = bob
+            quantity = 0
+            tradeAmountRemain = 0.0
+
+    charlieTradingPoint <- submit admin do
+        createCmd Reward.TradingPoint with
+            admin = admin
+            holderRewardPoint = charlie
+            quantity = 0
+            tradeAmountRemain = 0.0
+
+    trade_alice_charlie0 <- submit admin do
+        createCmd Reward.TradeSuccess with
+            admin = admin
+            seller = charlie
+            buyer = alice
+            tradeAmount = 1200.0
+            asset = "USDT"
+
+    submit admin do
+        exerciseCmd trade_alice_charlie0 Reward.IssueRewardPoint
+
+    trade_bob_alice0 <- submit admin do
+        createCmd Reward.TradeSuccess with
+            admin = admin
+            seller = alice
+            buyer = bob
+            tradeAmount = 800.0
+            asset = "BNB"
+
+    submit admin do
+        exerciseCmd trade_bob_alice0 Reward.IssueRewardPoint
+
+    trade_bob_alice1 <- submit admin do
+        createCmd Reward.TradeSuccess with
+            admin = admin
+            seller = alice
+            buyer = bob
+            tradeAmount = 600.0
+            asset = "BNB"
+
+    (issue_bob2, issue_alice3) <- submit admin do
+        exerciseCmd trade_bob_alice1 Reward.IssueRewardPoint
+
+    trade_bob_alice1 <- submit admin do
+        createCmd Reward.TradeSuccess with
+            admin = admin
+            seller = alice
+            buyer = bob
+            tradeAmount = 500.0
+            asset = "BNB"
+
+    (issue_bob2, issue_alice3) <- submit admin do
+        exerciseCmd trade_bob_alice1 Reward.IssueRewardPoint
+
+    trade_charlie_alice0 <- submit admin do
+        createCmd Reward.TradeSuccess with
+            admin = admin
+            seller = alice
+            buyer = charlie
+            tradeAmount = 800.0
+            asset = "BNB"
+
+    (issue_charlie2, issue_alice4) <- submit admin do
+        exerciseCmd trade_charlie_alice0 Reward.IssueRewardPoint
+
+
+    pure()

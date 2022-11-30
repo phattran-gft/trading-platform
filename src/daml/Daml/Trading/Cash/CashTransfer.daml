@@ -6,38 +6,49 @@ import Daml.Finance.Interface.Holding.Transferable qualified as Transferable (I,
 import Daml.Finance.Interface.Holding.Util (getAmount, getInstrument)
 import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K)
 import Daml.Finance.Interface.Types.Common (AccountKey(..))
+import Daml.Trading.Account.Account qualified as CreateAccount
+
 
 template Request
   with
+    custodian : Party
+    owner : Party
     receiverAccount : AccountKey
     instrument : Instrument.K
     amount : Decimal
-    currentOwner : Party
+    
   where
     signatory receiverAccount.owner
-    observer currentOwner
+    observer owner
 
     ensure amount > 0.0
 
-    choice Accept : ContractId Holding.I
+    choice Accept : (ContractId Holding.I, Optional (ContractId Holding.I))
       with
         holdingCid : ContractId Holding.I
-      controller currentOwner
+      controller owner
       do
         holding <- fetch holdingCid
-        getAmount holding === amount
         getInstrument holding === instrument
-
-        let transferableCid : ContractId Transferable.I = coerceContractId holdingCid
-
+        assertMsg "Balance insufficient" (amount <= getAmount holding)
+        
+        (accountCid,_) <- fetchByKey @CreateAccount.Account (custodian, owner)
+        (transferCid,remainingOpt) <- exercise accountCid CreateAccount.Split
+          with
+            holdingCid = holdingCid
+            amount = amount
+        let
+          transferableCid : ContractId Transferable.I = coerceContractId transferCid
         newTransferableCid <- exercise transferableCid Transferable.Transfer
           with
             newOwnerAccount = receiverAccount
-
-        pure $ toInterfaceContractId @Holding.I newTransferableCid
+        let
+          lastTransferableCid : ContractId Holding.I = coerceContractId newTransferableCid
+          remainingCid = coerceContractId  <$> remainingOpt
+        pure (lastTransferableCid,remainingCid)
 
     choice Decline : ()
-      controller currentOwner
+      controller owner
       do pure ()
 
     choice Withdraw : ()

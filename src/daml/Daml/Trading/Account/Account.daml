@@ -7,6 +7,11 @@ import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (Crea
 import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
 import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
 
+import Daml.Finance.Interface.Holding.Util (getAmount)
+import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
+import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..))
+import DA.List (head)
+
 cashLabel = "Cash"
 nftLabel = "Nft"
 
@@ -148,6 +153,19 @@ template Account
         whenSome optNftAccount \(nftAccountFactoryCid, _, nftAccountKey) -> do 
           exercise nftAccountFactoryCid Account.Remove with account = nftAccountKey 
         pure ()
+
+    nonconsuming choice Split : (ContractId Fungible.I, Optional (ContractId Fungible.I))
+      with
+        holdingCid : ContractId Holding.I
+        amount: Decimal
+      controller owner
+      do
+        holding <- fetch holdingCid
+        assertMsg "Balance insufficient" (amount <= getAmount holding)
+        let
+          fungibleCid : ContractId Fungible.I = coerceContractId holdingCid
+        Fungible.SplitResult{splitCids,rest} <- exercise fungibleCid Fungible.Split with amounts = [amount]
+        pure (head (splitCids), rest)
 
 -- we use custodian Party as admin for simplicity
 data AccountType 
