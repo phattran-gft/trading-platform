@@ -1,0 +1,81 @@
+module Daml.Trading.Tests.NFTTest where 
+
+import Daml.Script 
+
+import Daml.Finance.Interface.Types.Common (InstrumentKey(..), Id(..))
+
+import Daml.Trading.Account.Account qualified as CreateAccount
+import Daml.Trading.Nft.Nft qualified as Nft
+import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
+import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup 
+
+setup: Script () 
+setup = do 
+  (public, admin, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid) <- HoldingSetup.initialize 
+  [alice] <- UserSetup.createUsers public ["Alice"]
+
+  adminRequestCid <- submit admin do 
+    createCmd CreateAccount.Request 
+      with 
+        owner = admin 
+        custodian = admin 
+        accountType = CreateAccount.Admin 
+        username = "admin" 
+        realName = "Platform Admin" 
+        passportNumber = "111111" 
+        nationalId = "" 
+        address  = "Unknown" 
+  adminAccountCid <- submit admin $ exerciseCmd adminRequestCid CreateAccount.Request_Accept 
+  adminAccountCid <- submit admin $ exerciseCmd adminAccountCid CreateAccount.Create_Nft_Account 
+    with 
+      description = "Admin Nft Account" 
+      accountFactoryCid
+      holdingFactoryCid = nftHoldingFactoryCid
+      instrumentFactoryCid
+      observers = [] 
+  
+  aliceRequestCid <- submit alice do
+    createCmd CreateAccount.Request
+      with
+        owner = alice
+        custodian = admin
+        accountType = CreateAccount.Retail 
+        username = "alice" 
+        realName = "Alice Ackerson" 
+        passportNumber = "222222" 
+        nationalId = "" 
+        address  = "New York" 
+  aliceAccountCid <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
+  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid CreateAccount.Create_Nft_Account 
+    with 
+      description = "Alice Nft Account" 
+      accountFactoryCid 
+      holdingFactoryCid = nftHoldingFactoryCid 
+      instrumentFactoryCid 
+      observers = [] 
+
+  nftIssueRequestCid <- submit alice do 
+    createCmd Nft.Request 
+      with 
+        owner = alice 
+        admin 
+        pictureName = "Picture" 
+        pictureType = Nft.Landscape 
+        pictureDescription = "Picture Description" 
+        rarity = Nft.Rare 
+        royaltyRate = 0.025 
+        initialPrice = 100.0
+
+  aliceNftKey <- submit admin $ exerciseCmd nftIssueRequestCid Nft.Accept 
+
+  let 
+    expectedAliceNftKey = InstrumentKey with 
+      depository = admin 
+      issuer = admin 
+      id = Id "Picture" 
+      version = "0"
+  
+  assert (aliceNftKey == expectedAliceNftKey)
+
+  pure ()
