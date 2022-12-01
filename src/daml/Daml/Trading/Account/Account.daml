@@ -39,11 +39,11 @@ template HoldingFactoryReference
 template InstrumentFactoryReference 
   with 
     provider: Party 
-    holdingType: Text 
+    instrumentType: Text 
     instrumentFactoryCid: ContractId Instrument.F 
   where 
     signatory provider 
-    key (provider, holdingType): (Party, Text) 
+    key (provider, instrumentType): (Party, Text) 
     maintainer key._1 
 
 template Request 
