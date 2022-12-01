@@ -29,6 +29,8 @@ setup = do
         passportNumber = "111111" 
         nationalId = "" 
         address  = "Unknown" 
+        rewardPoint = 0
+        badges = []
   adminAccountCid <- submit admin $ exerciseCmd adminRequestCid CreateAccount.Request_Accept 
   adminAccountCid <- submit admin $ exerciseCmd adminAccountCid CreateAccount.Create_Cash_Account 
     with 
@@ -54,6 +56,8 @@ setup = do
         passportNumber = "222222" 
         nationalId = "" 
         address  = "New York" 
+        rewardPoint = 0
+        badges = []
   aliceAccountCid <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
   aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid CreateAccount.Create_Cash_Account 
     with 
@@ -73,6 +77,8 @@ setup = do
         passportNumber = "" 
         nationalId = "333333" 
         address  = "Boston" 
+        rewardPoint = 0
+        badges = []
   bobAccountCid <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
   bobAccountCid <- submit admin $ exerciseCmd bobAccountCid CreateAccount.Create_Cash_Account 
     with 
