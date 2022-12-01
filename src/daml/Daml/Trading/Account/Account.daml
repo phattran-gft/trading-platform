@@ -10,6 +10,11 @@ import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
 cashLabel = "Cash"
 nftLabel = "Nft"
 
+data BadgeType 
+  = Novice_Trader
+  | Pro_Trader
+  | Hall_of_Fame_Trader
+  deriving (Eq, Show)
 -- to fetch the account factory for subsequent account creation
 template AccountFactoryReference 
   with 
@@ -33,7 +38,7 @@ template HoldingFactoryReference
 
 template Request 
   with 
-    custodian: Party 
+    custodian: Party
     owner: Party 
     accountType: AccountType 
     username: Text 
@@ -41,6 +46,8 @@ template Request
     passportNumber: Text 
     nationalId: Text 
     address: Text 
+    rewardPoint : Int
+    badges: [BadgeType]
   where 
     signatory owner 
     observer custodian 
@@ -60,6 +67,8 @@ template Request
             address 
             optCashAccount = None 
             optNftAccount = None 
+            rewardPoint 
+            badges
 
     choice Request_Decline : ()
       controller custodian
@@ -81,6 +90,8 @@ template Account
     address: Text 
     optCashAccount: Optional (ContractId Account.F, ContractId Holding.F, AccountKey) 
     optNftAccount: Optional (ContractId Account.F, ContractId Holding.F, AccountKey) 
+    rewardPoint : Int
+    badges : [BadgeType]
   where 
     signatory custodian, owner 
     key (custodian, owner): (Party, Party)
@@ -138,6 +149,16 @@ template Account
         
         create this with optNftAccount = Some (accountFactoryCid, holdingFactoryCid, accountKey)
     
+    choice Create_Badge_Account: ContractId Account
+      with  
+        currentRewardPoint: Int
+        badge: BadgeType
+      controller custodian
+      do
+        create this with 
+          rewardPoint = currentRewardPoint
+          badges = badge :: badges
+
     choice Close_Account: () 
       controller owner 
       do 
