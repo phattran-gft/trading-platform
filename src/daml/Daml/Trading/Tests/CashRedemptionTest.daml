@@ -10,6 +10,7 @@ import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
 import Daml.Trading.Scripts.CashSetup qualified as CashSetup (initialize, instrumentData) 
 import Daml.Trading.Cash.CashRedemption qualified as CashRedemption
 import DA.Optional (fromSome)
+import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..),Merge(..))
 
 setup: Script ()
 setup = do 
@@ -67,82 +68,104 @@ setup = do
         amount = 1000.0
 
   aliceCashHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
-
-  aliceRequestWithdrawal <- submit alice do
-    createCmd CashRedemption.WithdrawalRequest
-      with 
-        custodian = admin
-        owner = alice
-        holdingCid = aliceCashHoldingCid
-        amount = 600.0
-        instrument = cashInstrument
-
-  aliceHoldingCidRemainOpt <- submit admin do 
-    exerciseCmd aliceRequestWithdrawal CashRedemption.Accept
-
-  let 
-    aliceHoldingCidRemain = fromSome aliceHoldingCidRemainOpt
-
-  aliceRequestWithdrawal2 <- submit alice do
-    createCmd CashRedemption.WithdrawalRequest
-      with 
-        custodian = admin
-        owner = alice
-        holdingCid = aliceHoldingCidRemain
-        amount = 50.0
-        instrument = cashInstrument
-
-  aliceCashHoldingCidremainingOpt <- submit admin do 
-    exerciseCmd aliceRequestWithdrawal2 CashRedemption.Accept
-
-  let
-    aliceCashHoldingCidremaining = fromSome aliceCashHoldingCidremainingOpt
-
-  bobRequestCid <- submit bob do
-    createCmd CreateAccount.Request
-      with
-        owner = bob
-        custodian = admin
-        accountType = CreateAccount.Retail 
-        username = "bob" 
-        realName = "Bob Bader" 
-        passportNumber = "" 
-        nationalId = "333333" 
-        address  = "Boston" 
-  bobAccountCid <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
-  bobAccountCid <- submit admin $ exerciseCmd bobAccountCid CreateAccount.Create_Cash_Account 
-    with 
-      description = "Bob Cash Account"
-      accountFactoryCid = accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid
-      observers = [alice]
-  let
-    bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id CreateAccount.cashLabel
   
-  transferRequestCid <- submit bob do
-    createCmd CashTransfer.Request
+  aliceRequestCid2 <- submit alice do
+    createCmd CreditCashAccount.Request
       with
-        receiverAccount = bobAccountKey
-        instrument = cashInstrument
-        amount = 330.0
         owner = alice
         custodian = admin
+        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
+        amount = 2000.0
 
-  (newbobHoldingCid,newaliceRemainingCid) <- submitMulti [alice] [public] do
-    exerciseCmd transferRequestCid CashTransfer.Accept
-      with
-        holdingCid = aliceCashHoldingCidremaining
+  aliceCashHoldingCid2 <- submit admin do exerciseCmd aliceRequestCid2 CreditCashAccount.Accept
+  
+  -- aliceCashHoldingCid2 <- submit admin do exerciseCmd aliceRequestCid2 CreditCashAccount.Decline
 
-  bobRequestWithdrawal <- submit bob do
-    createCmd CashRedemption.WithdrawalRequest
-      with 
-        custodian = admin
-        owner = bob
-        holdingCid = newbobHoldingCid
-        amount = 130.0
-        instrument = cashInstrument
+  -- aliceRequestWithdrawal <- submit alice do
+  --   createCmd CashRedemption.WithdrawalRequest
+  --     with 
+  --       custodian = admin
+  --       owner = alice
+  --       holdingCid = aliceCashHoldingCid
+  --       amount = 600.0
+  --       instrument = cashInstrument
 
-  bobCashHoldingCidremaining <- submit admin do 
-    exerciseCmd bobRequestWithdrawal CashRedemption.Accept
+  -- aliceHoldingCidRemainOpt <- submit admin do 
+  --   exerciseCmd aliceRequestWithdrawal CashRedemption.Accept
+
+  -- let 
+  --   aliceHoldingCidRemain = fromSome aliceHoldingCidRemainOpt
+
+  -- aliceRequestWithdrawal2 <- submit alice do
+  --   createCmd CashRedemption.WithdrawalRequest
+  --     with 
+  --       custodian = admin
+  --       owner = alice
+  --       holdingCid = aliceHoldingCidRemain
+  --       amount = 50.0
+  --       instrument = cashInstrument
+
+  -- aliceCashHoldingCidremainingOpt <- submit admin do 
+  --   exerciseCmd aliceRequestWithdrawal2 CashRedemption.Accept
+
+  -- let
+  --   aliceCashHoldingCidremaining = fromSome aliceCashHoldingCidremainingOpt
+
+  -- bobRequestCid <- submit bob do
+  --   createCmd CreateAccount.Request
+  --     with
+  --       owner = bob
+  --       custodian = admin
+  --       accountType = CreateAccount.Retail 
+  --       username = "bob" 
+  --       realName = "Bob Bader" 
+  --       passportNumber = "" 
+  --       nationalId = "333333" 
+  --       address  = "Boston" 
+  -- bobAccountCid <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
+  -- bobAccountCid <- submit admin $ exerciseCmd bobAccountCid CreateAccount.Create_Cash_Account 
+  --   with 
+  --     description = "Bob Cash Account"
+  --     accountFactoryCid = accountFactoryCid
+  --     holdingFactoryCid = cashHoldingFactoryCid
+  --     observers = [alice]
+  -- let
+  --   bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id CreateAccount.cashLabel
+  
+  -- transferRequestCid <- submit bob do
+  --   createCmd CashTransfer.Request
+  --     with
+  --       receiverAccount = bobAccountKey
+  --       instrument = cashInstrument
+  --       amount = 330.0
+  --       owner = alice
+  --       custodian = admin
+
+  -- (newbobHoldingCid,newaliceRemainingCid) <- submitMulti [alice] [public] do
+  --   exerciseCmd transferRequestCid CashTransfer.Accept
+  --     with
+  --       holdingCid = aliceCashHoldingCidremaining
+
+  -- bobRequestWithdrawal <- submit bob do
+  --   createCmd CashRedemption.WithdrawalRequest
+  --     with 
+  --       custodian = admin
+  --       owner = bob
+  --       holdingCid = newbobHoldingCid
+  --       amount = 130.0
+  --       instrument = cashInstrument
+
+  -- bobCashHoldingCidremaining <- submit admin do 
+  --   exerciseCmd bobRequestWithdrawal CashRedemption.Accept
+
+  -- bobRequestCid <- submit bob do
+  --   createCmd CreditCashAccount.Request
+  --     with
+  --       owner = bob
+  --       custodian = admin
+  --       instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
+  --       amount = 1000.0
+
+  -- aliceCashHoldingCid <- submit admin do exerciseCmd bobRequestCid CreditCashAccount.Accept
   
   pure()
