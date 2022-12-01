@@ -1,0 +1,72 @@
+module Daml.Trading.Tests.BadgeTest where
+import Daml.Trading.Reward.Badge qualified as Badge
+import Daml.Trading.Account.Account qualified as CreateAccount
+
+import Daml.Script
+
+setup : Script()
+
+setup = script do
+  admin <- allocateParty "Admin"
+  alice <- allocateParty "Alice"
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+
+  aliceRequestCid <- submit alice do
+    createCmd CreateAccount.Request
+      with
+        owner = alice
+        custodian = admin
+        accountType = CreateAccount.Retail 
+        username = "alice" 
+        realName = "Alice" 
+        passportNumber = "" 
+        nationalId = "333333" 
+        address  = "Boston" 
+        rewardPoint = 120
+        badges = []
+  aliceAccountCid <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
+  
+  alice_claim <- submit alice do
+      createCmd Badge.ClaimBadgeRequest with
+          admin = admin
+          user = alice
+          badge = CreateAccount.Pro_Trader
+
+  submit admin do
+    exerciseCmd alice_claim Badge.Proceed
+
+  alice_claim2 <- submit alice do
+      createCmd Badge.ClaimBadgeRequest with
+          admin = admin
+          user = alice
+          badge = CreateAccount.Novice_Trader
+
+  submit admin do
+    exerciseCmd alice_claim2 Badge.Proceed
+
+  bobRequestCid <- submit bob do
+    createCmd CreateAccount.Request
+      with
+        owner = bob
+        custodian = admin
+        accountType = CreateAccount.Retail 
+        username = "bob" 
+        realName = "Bob" 
+        passportNumber = "" 
+        nationalId = "333333" 
+        address  = "Boston" 
+        rewardPoint = 100
+        badges = []
+  bobAccountCid <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept
+  
+  bob_claim <- submit bob do
+      createCmd Badge.ClaimBadgeRequest with
+          admin = admin
+          user = bob
+          badge = CreateAccount.Novice_Trader
+
+  submit admin do
+    exerciseCmd bob_claim Badge.Proceed
+  pure()
+   
