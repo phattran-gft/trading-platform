@@ -5,6 +5,7 @@ import DA.Map qualified as M (fromList)
 import DA.Set qualified as S (fromList, singleton)
 import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (Create(..), F, Remove(..))
 import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
+import Daml.Finance.Interface.Instrument.Base.Factory qualified as Instrument (F)
 import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
 
 import Daml.Finance.Interface.Holding.Util (getAmount)
@@ -25,7 +26,6 @@ template AccountFactoryReference
     key provider: Party 
     maintainer key 
 
--- is this needed?
 template HoldingFactoryReference 
   with 
     provider: Party 
@@ -34,6 +34,16 @@ template HoldingFactoryReference
   where 
     signatory provider 
     key (provider, holdingType): (Party, Text) 
+    maintainer key._1 
+
+template InstrumentFactoryReference 
+  with 
+    provider: Party 
+    instrumentType: Text 
+    instrumentFactoryCid: ContractId Instrument.F 
+  where 
+    signatory provider 
+    key (provider, instrumentType): (Party, Text) 
     maintainer key._1 
 
 template Request 
@@ -85,7 +95,7 @@ template Account
     nationalId: Text 
     address: Text 
     optCashAccount: Optional (ContractId Account.F, ContractId Holding.F, AccountKey) 
-    optNftAccount: Optional (ContractId Account.F, ContractId Holding.F, AccountKey) 
+    optNftAccount: Optional (ContractId Account.F, ContractId Holding.F, ContractId Instrument.F, AccountKey) 
   where 
     signatory custodian, owner 
     key (custodian, owner): (Party, Party)
@@ -126,6 +136,7 @@ template Account
         description: Text 
         accountFactoryCid: ContractId Account.F 
         holdingFactoryCid: ContractId Holding.F 
+        instrumentFactoryCid: ContractId Instrument.F
         observers: [Party] 
       controller custodian 
       do 
@@ -141,7 +152,7 @@ template Account
           holdingFactoryCid = holdingFactoryCid
           observers = M.fromList [("AccountObservers", observersSet)]
         
-        create this with optNftAccount = Some (accountFactoryCid, holdingFactoryCid, accountKey)
+        create this with optNftAccount = Some (accountFactoryCid, holdingFactoryCid, instrumentFactoryCid, accountKey)
     
     choice Close_Account: () 
       controller owner 
@@ -150,7 +161,7 @@ template Account
         -- remove all associated accounts
         whenSome optCashAccount \(cashAccountFactoryCid, _, cashAccountKey) -> do 
           exercise cashAccountFactoryCid Account.Remove with account = cashAccountKey 
-        whenSome optNftAccount \(nftAccountFactoryCid, _, nftAccountKey) -> do 
+        whenSome optNftAccount \(nftAccountFactoryCid, _, _, nftAccountKey) -> do 
           exercise nftAccountFactoryCid Account.Remove with account = nftAccountKey 
         pure ()
 
