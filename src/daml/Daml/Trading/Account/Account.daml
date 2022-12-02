@@ -12,9 +12,6 @@ import Daml.Finance.Interface.Holding.Util (getAmount)
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..),Merge(..))
 import DA.List (head,tail)
-import DA.Optional (fromSome)
-import DA.Action (foldlA)
-import DA.Assert
 
 cashLabel = "Cash"
 nftLabel = "Nft"
