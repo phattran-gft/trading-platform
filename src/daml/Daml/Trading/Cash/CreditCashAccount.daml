@@ -3,14 +3,8 @@ module Daml.Trading.Cash.CreditCashAccount where
 import Daml.Finance.Interface.Holding.Account qualified as Account (Credit(..), I, exerciseInterfaceByKey)
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K, qty)
-import Daml.Finance.Interface.Types.Common (InstrumentKey(..), AccountKey(..), Id(..))
-import Daml.Trading.Account.Account qualified as CreateAccount
-import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (ArchiveFungible(..), I)
-import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
-import Daml.Trading.Scripts.CashSetup qualified as CashSetup (initialize, instrumentData)
-import DA.Optional (fromSome,isNone,listToOptional)
+import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
 import Daml.Trading.Account.Account (cashLabel)
-import Daml.Finance.Interface.Holding.Util (getAmount)
 
 template Request
   with
@@ -25,50 +19,13 @@ template Request
     ensure amount > 0.0
 
     choice Accept : ContractId Holding.I
-    -- choice Fungible : ContractId Fungible.I
-    -- choice Accept : ()
       controller custodian 
       do
         let
           accountKey = AccountKey with custodian, owner, id = Id cashLabel
-        newholding <- Account.exerciseInterfaceByKey @Account.I accountKey custodian Account.Credit
+        Account.exerciseInterfaceByKey @Account.I accountKey custodian Account.Credit
           with
             quantity = Instrument.qty amount instrument
-        let
-          (instrumentId, instrumentVersion) = CashSetup.instrumentData
-          newfungibleCid : ContractId Fungible.I = coerceContractId newholding
-        -- exercise newfungibleCid Fungible.ArchiveFungible
-
-        (accountCid,dataAccount) <- fetchByKey @CreateAccount.Account (custodian, owner) 
-        let
-            oldholdingCid : ContractId Holding.I = coerceContractId accountCid
-            oldfungibleCid : ContractId Fungible.I = coerceContractId accountCid
-        -- exercise oldfungibleCid Fungible.ArchiveFungible
-        -- pure(newholding)
-
-
-        -- let
-        --   listoldholdingCid = oldholdingCid :: listoldholdingCid
-        --   oldfungibleCidOpt = listToOptional (listoldholdingCid)
-        
-        -- mergefungibleCid <- exercise accountCid CreateAccount.Merge with
-        --   newholdingCid = newholding
-        --   oldholdingCid = oldholdingCid
-        
-        -- let
-        --     mergeholdingCid : ContractId Holding.I = coerceContractId mergefungibleCid
-        -- pure(mergeholdingCid)
-        fetchnewholding <- fetch newholding
-        fetcoldholdholding <- fetch oldholdingCid
-        sumAmountRequest <- create Request
-          with
-            owner = owner
-            custodian = custodian
-            instrument = InstrumentKey with issuer = custodian; depository = custodian; id = instrumentId; version = instrumentVersion
-            amount = getAmount fetchnewholding + getAmount fetcoldholdholding
-        sumAmountAccept <- exercise sumAmountRequest Accept
-        
-        pure (sumAmountAccept)
         
 
     choice Decline : ()

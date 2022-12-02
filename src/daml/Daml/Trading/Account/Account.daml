@@ -10,7 +10,7 @@ import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
 import Daml.Finance.Interface.Holding.Util (getAmount)
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..),Merge(..))
-import DA.List (head)
+import DA.List (head,tail)
 import DA.Optional (fromSome)
 import DA.Action (foldlA)
 import DA.Assert
@@ -157,7 +157,7 @@ template Account
           exercise nftAccountFactoryCid Account.Remove with account = nftAccountKey 
         pure ()
 
-    nonconsuming choice Split : (ContractId Fungible.I, Optional (ContractId Fungible.I))
+    nonconsuming choice Split : (ContractId Holding.I, Optional (ContractId Holding.I))
       with
         holdingCid : ContractId Holding.I
         amount: Decimal
@@ -168,31 +168,22 @@ template Account
         let
           fungibleCid : ContractId Fungible.I = coerceContractId holdingCid
         Fungible.SplitResult{splitCids,rest} <- exercise fungibleCid Fungible.Split with amounts = [amount]
-        pure (head (splitCids), rest)
+        let
+          splitholdingCid = coerceContractId (head (splitCids))
+          restholdingCid =  coerceContractId <$> rest
+        pure (splitholdingCid, restholdingCid)
 
-    -- choice Merge : ContractId Fungible.I
-    --   with
-    --     fungibleCids : [ContractId Holding.I]
-    --   controller owner
-    --   do
-    --     deposit <-foldlA
-    --           (\acc cid -> do
-    --             c <- fetch cid
-    --             -- c === (setQty c.asset.quantity acc)
-    --             return $ (c.amount)
-    --           )
-    --           this
-    --           fungibleCids
-    --     mergeAccCid <- create deposit
-   
-    --     let
-    --         mergeFungibleCid : ContractId Fungible.I = coerceContractId mergeAccCid
-        --     -- oldfungibleCid : ContractId Fungible.I = coerceContractId oldfungibleCids
-        --     -- oldholdingCid = coerceContractId <$> oldholdingCids
-        --     oldfungibleCid : ContractId Fungible.I = coerceContractId oldholdingCid
-        -- mergeFungibleCid <- exercise oldfungibleCid Fungible.Merge with fungibleCids = [oldfungibleCid]
-        -- pure (mergeFungibleCid)
-
+    nonconsuming choice Merge : ContractId Holding.I
+      with
+        holdingCids : [ContractId Holding.I]
+      controller owner
+      do
+        let
+          fungibleCids : [ContractId Fungible.I] = map (\hCid -> coerceContractId hCid) holdingCids
+        mergeFungibles <- exercise (head(fungibleCids)) Fungible.Merge with fungibleCids = tail(fungibleCids)
+        let
+          mergeholding = coerceContractId mergeFungibles
+        pure (mergeholding)
 
 
 -- we use custodian Party as admin for simplicity
