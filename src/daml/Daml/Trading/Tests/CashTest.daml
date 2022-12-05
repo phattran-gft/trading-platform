@@ -16,32 +16,6 @@ setup = do
     cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid) <- HoldingSetup.initialize 
   [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
 
-  adminRequestCid <- submit admin do 
-    createCmd CreateAccount.Request 
-      with 
-        owner = admin 
-        custodian = admin 
-        accountType = CreateAccount.Admin 
-        username = "admin" 
-        realName = "Platform Admin" 
-        passportNumber = "111111" 
-        nationalId = "" 
-        address  = "Unknown" 
-  adminAccountCid <- submit admin $ exerciseCmd adminRequestCid CreateAccount.Request_Accept 
-  adminAccountCid <- submit admin $ exerciseCmd adminAccountCid CreateAccount.Create_Cash_Account 
-    with 
-      description = "Admin Cash Account" 
-      accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid
-      observers = [] 
-  adminAccountCid <- submit admin $ exerciseCmd adminAccountCid CreateAccount.Create_Nft_Account 
-    with 
-      description = "Admin Nft Account" 
-      accountFactoryCid
-      holdingFactoryCid = nftHoldingFactoryCid
-      instrumentFactoryCid
-      observers = [] 
-
   aliceRequestCid <- submit alice do
     createCmd CreateAccount.Request
       with
@@ -95,15 +69,15 @@ setup = do
 
   aliceCashHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
 
-  transferRequestCid <- submit bob do
-    createCmd CashTransfer.Request
-      with
-        receiverAccount = bobAccountKey
-        instrument = cashInstrument
-        amount = 800.0
-        owner = alice
-        custodian = admin
+  -- transferRequestCid <- submit bob do
+  --   createCmd CashTransfer.Request
+  --     with
+  --       receiverAccount = bobAccountKey
+  --       instrument = cashInstrument
+  --       amount = 800.0
+  --       owner = alice
+  --       custodian = admin
 
-  newHoldingCid <- submitMulti [alice] [public] do exerciseCmd transferRequestCid CashTransfer.Accept with holdingCid = aliceCashHoldingCid
+  -- newHoldingCid <- submitMulti [alice] [public] do exerciseCmd transferRequestCid CashTransfer.Accept with holdingCid = aliceCashHoldingCid
 
   pure ()

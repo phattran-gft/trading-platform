@@ -4,7 +4,8 @@ import Daml.Finance.Interface.Holding.Account qualified as Account (Credit(..), 
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K, qty)
 import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
-import Daml.Trading.Account.Account (cashLabel)
+import Daml.Trading.Account.Account qualified as CreateAccount
+import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 
 template Request
   with
@@ -21,12 +22,33 @@ template Request
     choice Accept : ContractId Holding.I
       controller custodian 
       do
-        let
-          accountKey = AccountKey with custodian, owner, id = Id cashLabel
-        Account.exerciseInterfaceByKey @Account.I accountKey custodian Account.Credit
-          with
-            quantity = Instrument.qty amount instrument
-        
+        if owner == custodian then do
+          let
+            accountKey = AccountKey with custodian, owner, id = Id CreateAccount.cashLabel
+          Account.exerciseInterfaceByKey @Account.I accountKey custodian Account.Credit
+            with
+              quantity = Instrument.qty amount instrument
+        else do
+          let
+            userAccount = AccountKey with custodian = custodian, owner = owner, id = Id CreateAccount.cashLabel
+            -- burnCid : ContractId Holding.I = coerceContractId holdingCid
+          transferRequest <- create CashTransfer.Request
+            with
+              receiverAccount = userAccount
+              instrument = instrument
+              amount = amount
+              owner = owner
+              custodian = custodian
+
+          (adminCid,_) <- fetchByKey @CreateAccount.Account (custodian, custodian)
+          let
+            adminHoldingCid : ContractId Holding.I = coerceContractId adminCid
+
+          (userHoldingCid, adminRemaining) <- exercise transferRequest CashTransfer.Accept
+            with
+              holdingCid = adminHoldingCid
+          -- pure(userHoldingCid)
+          pure(userHoldingCid)
 
     choice Decline : ()
       controller custodian

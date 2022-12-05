@@ -16,25 +16,6 @@ setup = do
   (public, admin, cashInstrument, accountFactoryCid, 
     cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid) <- HoldingSetup.initialize 
   [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
-
-  adminRequestCid <- submit admin do 
-    createCmd CreateAccount.Request 
-      with 
-        owner = admin 
-        custodian = admin 
-        accountType = CreateAccount.Admin 
-        username = "admin" 
-        realName = "Platform Admin" 
-        passportNumber = "111111" 
-        nationalId = "" 
-        address  = "Unknown" 
-  adminAccountCid <- submit admin $ exerciseCmd adminRequestCid CreateAccount.Request_Accept 
-  adminBurnAccountCid <- submit admin $ exerciseCmd adminAccountCid CreateAccount.Create_Cash_Account 
-    with 
-      description = "Admin Cash Burn Account" 
-      accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid
-      observers = [] 
   
   aliceRequestCid <- submit alice do
     createCmd CreateAccount.Request
