@@ -1,7 +1,6 @@
 module Daml.Trading.Tests.BadgeTest where
-import Daml.Trading.Reward.Badge qualified as Badge
 import Daml.Trading.Account.Account qualified as CreateAccount
-
+import Daml.Trading.Reward.Badge qualified as Badge
 import Daml.Script
 
 setup : Script()
@@ -12,61 +11,51 @@ setup = script do
   bob <- allocateParty "Bob"
   charlie <- allocateParty "Charlie"
 
-  aliceRequestCid <- submit alice do
-    createCmd CreateAccount.Request
+  aliceCreateAccountCid <- submit admin do
+    createCmd CreateAccount.Account
       with
-        owner = alice
         custodian = admin
+        owner = alice
         accountType = CreateAccount.Retail 
         username = "alice" 
         realName = "Alice" 
         passportNumber = "" 
         nationalId = "333333" 
         address  = "Boston" 
-        rewardPoint = 120
+        optCashAccount = None 
+        optNftAccount = None 
+        rewardPoints = 1600
         badges = []
-  aliceAccountCid <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
-  
-  alice_claim <- submit alice do
-      createCmd Badge.ClaimBadgeRequest with
-          admin = admin
-          user = alice
-          badge = CreateAccount.Pro_Trader
 
-  submit admin do
-    exerciseCmd alice_claim Badge.Proceed
+  aliceRedeem1 <- submit alice do
+    exerciseCmd aliceCreateAccountCid CreateAccount.Redeem_Badge with 
+      redeem_badge = Badge.Novice_Trader 
 
-  alice_claim2 <- submit alice do
-      createCmd Badge.ClaimBadgeRequest with
-          admin = admin
-          user = alice
-          badge = CreateAccount.Novice_Trader
-
-  submit admin do
-    exerciseCmd alice_claim2 Badge.Proceed
-
-  bobRequestCid <- submit bob do
-    createCmd CreateAccount.Request
+  bobCreateAccountCid <- submit admin do
+    createCmd CreateAccount.Account
       with
-        owner = bob
         custodian = admin
+        owner = bob
         accountType = CreateAccount.Retail 
-        username = "bob" 
+        username = "bọb" 
         realName = "Bob" 
         passportNumber = "" 
-        nationalId = "333333" 
+        nationalId = "111111" 
         address  = "Boston" 
-        rewardPoint = 100
+        optCashAccount = None 
+        optNftAccount = None 
+        rewardPoints = 120
         badges = []
-  bobAccountCid <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept
-  
-  bob_claim <- submit bob do
-      createCmd Badge.ClaimBadgeRequest with
-          admin = admin
-          user = bob
-          badge = CreateAccount.Novice_Trader
 
-  submit admin do
-    exerciseCmd bob_claim Badge.Proceed
+  bobRedeem1 <- submit bob do
+    exerciseCmd bobCreateAccountCid CreateAccount.Redeem_Badge with 
+      redeem_badge = Badge.Novice_Trader 
+
+  aliceRedeem2 <- submit alice do
+    exerciseCmd aliceRedeem1 CreateAccount.Redeem_Badge with 
+      redeem_badge = Badge.Pro_Trader
+
+  submitMustFail alice do
+    exerciseCmd aliceRedeem2 CreateAccount.Redeem_Badge with 
+      redeem_badge = Badge.Novice_Trader
   pure()
-   
