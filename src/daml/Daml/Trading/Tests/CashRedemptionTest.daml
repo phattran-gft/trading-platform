@@ -14,7 +14,7 @@ import DA.Optional (fromSome)
 setup: Script ()
 setup = do 
   (public, admin, cashInstrument, accountFactoryCid, 
-    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid) <- HoldingSetup.initialize 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid) <- HoldingSetup.initialize 
   [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
   
   aliceRequestCid <- submit alice do
@@ -41,24 +41,26 @@ setup = do
     adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id CreateAccount.cashLabel
   
   aliceRequestCid <- submit alice do
-    createCmd CreditCashAccount.Request
+    createCmd CreditCashAccount.UserRequest
       with
         owner = alice
         custodian = admin
         instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
         amount = 1000.0
+        holdingCid = adminHoldingCid
 
-  aliceCashHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
+  aliceCashHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Credit
   
   aliceRequestCid2 <- submit alice do
-    createCmd CreditCashAccount.Request
+    createCmd CreditCashAccount.UserRequest
       with
         owner = alice
         custodian = admin
+        holdingCid = adminHoldingCid
         instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
         amount = 2000.0
 
-  aliceCashHoldingCid2 <- submit admin do exerciseCmd aliceRequestCid2 CreditCashAccount.Accept
+  aliceCashHoldingCid2 <- submit admin do exerciseCmd aliceRequestCid2 CreditCashAccount.Credit
   
   aliceMergeCashHoldingCid <- submit alice do exerciseCmd aliceAccountCid CreateAccount.Merge with holdingCids = [aliceCashHoldingCid,aliceCashHoldingCid2]
 
@@ -143,12 +145,13 @@ setup = do
     bobCashHoldingCidremaining = fromSome bobCashHoldingCidremainingOpt
 
   bobRequestCid <- submit bob do
-    createCmd CreditCashAccount.Request
+    createCmd CreditCashAccount.UserRequest
       with
         owner = bob
         custodian = admin
         instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
         amount = 1000.0
+        holdingCid = adminHoldingCid
 
   bobCashHoldingCid <- submit admin do exerciseCmd bobRequestCid CreditCashAccount.Accept
   

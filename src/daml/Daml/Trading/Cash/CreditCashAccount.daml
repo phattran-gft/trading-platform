@@ -7,7 +7,7 @@ import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
 import Daml.Trading.Account.Account qualified as CreateAccount
 import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 
-template Request
+template AdminRequest
   with
     owner: Party 
     custodian: Party 
@@ -22,38 +22,58 @@ template Request
     choice Accept : ContractId Holding.I
       controller custodian 
       do
-        if owner == custodian then do
-          let
-            accountKey = AccountKey with custodian, owner, id = Id CreateAccount.cashLabel
-          Account.exerciseInterfaceByKey @Account.I accountKey custodian Account.Credit
-            with
-              quantity = Instrument.qty amount instrument
-        else do
-          let
-            userAccount = AccountKey with custodian = custodian, owner = owner, id = Id CreateAccount.cashLabel
-            -- burnCid : ContractId Holding.I = coerceContractId holdingCid
-          transferRequest <- create CashTransfer.Request
-            with
-              receiverAccount = userAccount
-              instrument = instrument
-              amount = amount
-              owner = owner
-              custodian = custodian
-
-          (adminCid,_) <- fetchByKey @CreateAccount.Account (custodian, custodian)
-          let
-            adminHoldingCid : ContractId Holding.I = coerceContractId adminCid
-
-          (userHoldingCid, adminRemaining) <- exercise transferRequest CashTransfer.Accept
-            with
-              holdingCid = adminHoldingCid
-          -- pure(userHoldingCid)
-          pure(userHoldingCid)
+        let
+          accountKey = AccountKey with custodian, owner, id = Id CreateAccount.cashLabel
+        Account.exerciseInterfaceByKey @Account.I accountKey custodian Account.Credit
+          with
+            quantity = Instrument.qty amount instrument
 
     choice Decline : ()
       controller custodian
       do pure ()
 
     choice Withdraw : ()
+      controller owner
+      do pure ()
+
+
+template UserRequest
+  with
+    owner: Party 
+    custodian: Party 
+    instrument : Instrument.K
+    amount : Decimal
+    holdingCid : ContractId Holding.I
+  where
+    signatory owner
+    observer custodian
+
+    ensure amount > 0.0
+
+    choice Credit :  Optional (ContractId Holding.I)
+      controller custodian
+      do
+        let
+          userAccount = AccountKey with custodian = custodian, owner = owner, id = Id CreateAccount.cashLabel
+
+        transferRequest <- create CashTransfer.Request
+          with
+            receiverAccount = userAccount
+            instrument = instrument
+            amount = amount
+            owner = owner
+            custodian = custodian
+
+        (userHoldingCid, adminRemaining) <- exercise transferRequest CashTransfer.Accept
+          with
+            holdingCid = holdingCid
+
+        pure(adminRemaining)
+    
+    choice Reject : ()
+      controller custodian
+      do pure ()
+
+    choice Remove : ()
       controller owner
       do pure ()
