@@ -188,9 +188,9 @@ template Account
       do
         let
           fungibleCids : [ContractId Fungible.I] = map (\hCid -> coerceContractId hCid) holdingCids
-        mergeFungibles <- exercise (head(fungibleCids)) Fungible.Merge with fungibleCids = tail(fungibleCids)
+        mergeFungible <- exercise (head(fungibleCids)) Fungible.Merge with fungibleCids = tail(fungibleCids)
         let
-          mergeholding = coerceContractId mergeFungibles
+          mergeholding = coerceContractId mergeFungible
         pure (mergeholding)
 
 
