@@ -1,20 +1,16 @@
 module Daml.Trading.Account.Account where 
 
 import DA.Optional (whenSome, isNone)
-import DA.Map qualified as M (fromList)
 import DA.Set qualified as S (fromList, singleton)
 import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (Create(..), F, Remove(..))
 import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
 import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
+import Daml.Trading.Reward.Badge qualified as Badge
+import DA.Map qualified as M
 
 cashLabel = "Cash"
 nftLabel = "Nft"
 
-data BadgeType 
-  = Novice_Trader
-  | Pro_Trader
-  | Hall_of_Fame_Trader
-  deriving (Eq, Show)
 -- to fetch the account factory for subsequent account creation
 template AccountFactoryReference 
   with 
@@ -46,8 +42,6 @@ template Request
     passportNumber: Text 
     nationalId: Text 
     address: Text 
-    rewardPoint : Int
-    badges: [BadgeType]
   where 
     signatory owner 
     observer custodian 
@@ -67,8 +61,8 @@ template Request
             address 
             optCashAccount = None 
             optNftAccount = None 
-            rewardPoint 
-            badges
+            rewardPoints = 0 
+            badges = []
 
     choice Request_Decline : ()
       controller custodian
@@ -90,10 +84,11 @@ template Account
     address: Text 
     optCashAccount: Optional (ContractId Account.F, ContractId Holding.F, AccountKey) 
     optNftAccount: Optional (ContractId Account.F, ContractId Holding.F, AccountKey) 
-    rewardPoint : Int
-    badges : [BadgeType]
+    rewardPoints : Int
+    badges : [ContractId Badge.Badge]
   where 
-    signatory custodian, owner 
+    signatory custodian 
+    observer owner
     key (custodian, owner): (Party, Party)
     maintainer key._1 
 
@@ -149,15 +144,50 @@ template Account
         
         create this with optNftAccount = Some (accountFactoryCid, holdingFactoryCid, accountKey)
     
-    choice Create_Badge_Account: ContractId Account
+    choice Redeem_Badge: ContractId Account
       with  
-        currentRewardPoint: Int
-        badge: BadgeType
-      controller custodian
+        redeem_badge: Badge.BadgeType
+      controller owner
       do
-        create this with 
-          rewardPoint = currentRewardPoint
-          badges = badge :: badges
+        contractBadgeList <- forA badges \badge -> fetch badge
+        let
+          badgeResult = filter (\contractBadge -> contractBadge.badge == redeem_badge) contractBadgeList
+          currentRewardPoints = rewardPoints
+        if currentRewardPoints >= 20 && null badgeResult && redeem_badge == Badge.Novice_Trader then do
+          newBadge <- create Badge.Badge with 
+            admin = custodian
+            owner = owner
+            badge = redeem_badge
+          accountWithBadgeCid <- create Account with 
+            rewardPoints = currentRewardPoints - 20
+            badges = newBadge :: badges
+            ..
+          pure(accountWithBadgeCid)
+        else do
+          if currentRewardPoints >= 100 && null badgeResult && redeem_badge == Badge.Pro_Trader then do
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 100
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
+          else do 
+            if currentRewardPoints >= 1000 && null badgeResult && redeem_badge == Badge.Hall_of_Fame_Trader then do
+              newBadge <- create Badge.Badge with 
+                admin = custodian
+                owner = owner
+                badge = redeem_badge
+              accountWithBadgeCid <- create Account with 
+                rewardPoints = currentRewardPoints - 1000
+                badges = newBadge :: badges
+                ..
+              pure(accountWithBadgeCid)
+            else do 
+              (accountCid, account) <- fetchByKey @Account (custodian, owner)
+              pure(accountCid)
 
     choice Close_Account: () 
       controller owner 
