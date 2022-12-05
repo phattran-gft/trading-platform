@@ -4,7 +4,6 @@ import Daml.Finance.Interface.Holding.Account qualified as Account (Credit(..), 
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K, qty)
 import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
-
 import Daml.Trading.Account.Account (cashLabel)
 
 template Request
@@ -22,11 +21,12 @@ template Request
     choice Accept : ContractId Holding.I
       controller custodian 
       do
-        let 
+        let
           accountKey = AccountKey with custodian, owner, id = Id cashLabel
         Account.exerciseInterfaceByKey @Account.I accountKey custodian Account.Credit
           with
             quantity = Instrument.qty amount instrument
+        
 
     choice Decline : ()
       controller custodian

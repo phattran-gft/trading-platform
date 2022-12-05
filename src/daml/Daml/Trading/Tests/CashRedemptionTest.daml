@@ -7,13 +7,14 @@ import Daml.Trading.Account.Account qualified as CreateAccount
 import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
-import Daml.Trading.Scripts.CashSetup qualified as CashSetup (initialize, instrumentData) 
+import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (initialize, instrumentData) 
 import Daml.Trading.Cash.CashRedemption qualified as CashRedemption
 import DA.Optional (fromSome)
 
 setup: Script ()
 setup = do 
-  (public, admin, cashInstrument, accountFactoryCid, cashHoldingFactoryCid, nftHoldingFactoryCid) <- CashSetup.initialize 
+  (public, admin, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid) <- HoldingSetup.initialize 
   [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
 
   adminRequestCid <- submit admin do 
@@ -54,7 +55,7 @@ setup = do
       holdingFactoryCid = cashHoldingFactoryCid
       observers = []
   let 
-    (instrumentId, instrumentVersion) = CashSetup.instrumentData
+    (instrumentId, instrumentVersion) = HoldingSetup.instrumentData
     aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id CreateAccount.cashLabel
     adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id CreateAccount.cashLabel
   
@@ -67,13 +68,25 @@ setup = do
         amount = 1000.0
 
   aliceCashHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
+  
+  aliceRequestCid2 <- submit alice do
+    createCmd CreditCashAccount.Request
+      with
+        owner = alice
+        custodian = admin
+        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
+        amount = 2000.0
+
+  aliceCashHoldingCid2 <- submit admin do exerciseCmd aliceRequestCid2 CreditCashAccount.Accept
+  
+  aliceMergeCashHoldingCid <- submit alice do exerciseCmd aliceAccountCid CreateAccount.Merge with holdingCids = [aliceCashHoldingCid,aliceCashHoldingCid2]
 
   aliceRequestWithdrawal <- submit alice do
     createCmd CashRedemption.WithdrawalRequest
       with 
         custodian = admin
         owner = alice
-        holdingCid = aliceCashHoldingCid
+        holdingCid = aliceMergeCashHoldingCid
         amount = 600.0
         instrument = cashInstrument
 
@@ -142,7 +155,22 @@ setup = do
         amount = 130.0
         instrument = cashInstrument
 
-  bobCashHoldingCidremaining <- submit admin do 
+  bobCashHoldingCidremainingOpt <- submit admin do 
     exerciseCmd bobRequestWithdrawal CashRedemption.Accept
+
+  let
+    bobCashHoldingCidremaining = fromSome bobCashHoldingCidremainingOpt
+
+  bobRequestCid <- submit bob do
+    createCmd CreditCashAccount.Request
+      with
+        owner = bob
+        custodian = admin
+        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
+        amount = 1000.0
+
+  bobCashHoldingCid <- submit admin do exerciseCmd bobRequestCid CreditCashAccount.Accept
   
+  bobMergeCashHoldingCid <- submit bob do exerciseCmd bobAccountCid CreateAccount.Merge with holdingCids = [bobCashHoldingCidremaining,bobCashHoldingCid]
+
   pure()
