@@ -3,11 +3,12 @@ module Daml.Trading.Tests.CashRedemptionTest where
 import Daml.Script
 
 import Daml.Finance.Interface.Types.Common (InstrumentKey(..), AccountKey(..), Id(..))
-import Daml.Trading.Account.Account qualified as CreateAccount
+import Daml.Trading.Account.CreateAccount qualified as CreateAccount
+import Daml.Trading.Account.Account qualified as Account
 import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
-import Daml.Trading.Scripts.CashSetup qualified as CashSetup (initialize, instrumentData) 
+import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (initialize, instrumentData) 
 import Daml.Trading.Cash.CashRedemption qualified as CashRedemption
 import DA.Optional (fromSome)
 
@@ -21,14 +22,14 @@ setup = do
       with 
         owner = admin 
         custodian = admin 
-        accountType = CreateAccount.Admin 
+        accountType = Account.Admin 
         username = "admin" 
         realName = "Platform Admin" 
         passportNumber = "111111" 
         nationalId = "" 
         address  = "Unknown" 
   adminAccountCid <- submit admin $ exerciseCmd adminRequestCid CreateAccount.Request_Accept 
-  adminBurnAccountCid <- submit admin $ exerciseCmd adminAccountCid CreateAccount.Create_Cash_Account 
+  adminBurnAccountCid <- submit admin $ exerciseCmd adminAccountCid Account.Create_Cash_Account 
     with 
       description = "Admin Cash Burn Account" 
       accountFactoryCid
@@ -40,23 +41,23 @@ setup = do
       with
         owner = alice
         custodian = admin
-        accountType = CreateAccount.Retail 
+        accountType = Account.Retail 
         username = "alice" 
         realName = "Alice Ackerson" 
         passportNumber = "222222" 
         nationalId = "" 
         address  = "New York" 
   aliceAccountCid <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
-  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid CreateAccount.Create_Cash_Account 
+  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Cash_Account 
     with 
       description = "Alice Cash Account"
       accountFactoryCid = accountFactoryCid
       holdingFactoryCid = cashHoldingFactoryCid
       observers = []
   let 
-    (instrumentId, instrumentVersion) = CashSetup.instrumentData
-    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id CreateAccount.cashLabel
-    adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id CreateAccount.cashLabel
+    (instrumentId, instrumentVersion) = HoldingSetup.instrumentData
+    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id Account.cashLabel
+    adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id Account.cashLabel
   
   aliceRequestCid <- submit alice do
     createCmd CreditCashAccount.Request
@@ -103,21 +104,21 @@ setup = do
       with
         owner = bob
         custodian = admin
-        accountType = CreateAccount.Retail 
+        accountType = Account.Retail 
         username = "bob" 
         realName = "Bob Bader" 
         passportNumber = "" 
         nationalId = "333333" 
         address  = "Boston" 
   bobAccountCid <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
-  bobAccountCid <- submit admin $ exerciseCmd bobAccountCid CreateAccount.Create_Cash_Account 
+  bobAccountCid <- submit admin $ exerciseCmd bobAccountCid Account.Create_Cash_Account 
     with 
       description = "Bob Cash Account"
       accountFactoryCid = accountFactoryCid
       holdingFactoryCid = cashHoldingFactoryCid
       observers = [alice]
   let
-    bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id CreateAccount.cashLabel
+    bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id Account.cashLabel
   
   transferRequestCid <- submit bob do
     createCmd CashTransfer.Request

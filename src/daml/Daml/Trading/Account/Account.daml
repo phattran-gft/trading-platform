@@ -1,17 +1,16 @@
 module Daml.Trading.Account.Account where 
 
-import DA.Optional (whenSome, isNone)
+import DA.Optional (isNone)
 import DA.Map qualified as M (fromList)
 import DA.Set qualified as S (fromList, singleton)
-import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (Create(..), F, Remove(..))
+import DA.List (head)
+import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (Create(..), F)
 import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
 import Daml.Finance.Interface.Instrument.Base.Factory qualified as Instrument (F)
 import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
-
 import Daml.Finance.Interface.Holding.Util (getAmount)
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..))
-import DA.List (head)
 
 cashLabel = "Cash"
 nftLabel = "Nft"
@@ -45,44 +44,6 @@ template InstrumentFactoryReference
     signatory provider 
     key (provider, instrumentType): (Party, Text) 
     maintainer key._1 
-
-template Request 
-  with 
-    custodian: Party 
-    owner: Party 
-    accountType: AccountType 
-    username: Text 
-    realName: Text 
-    passportNumber: Text 
-    nationalId: Text 
-    address: Text 
-  where 
-    signatory owner 
-    observer custodian 
-
-    choice Request_Accept: ContractId Account 
-      controller custodian 
-      do
-        create Account 
-          with 
-            custodian 
-            owner 
-            accountType 
-            username 
-            realName 
-            passportNumber 
-            nationalId 
-            address 
-            optCashAccount = None 
-            optNftAccount = None 
-
-    choice Request_Decline : ()
-      controller custodian
-      do pure ()
-
-    choice Request_Withdraw : ()
-      controller owner
-      do pure ()
 
 template Account 
   with 
@@ -153,17 +114,6 @@ template Account
           observers = M.fromList [("AccountObservers", observersSet)]
         
         create this with optNftAccount = Some (accountFactoryCid, holdingFactoryCid, instrumentFactoryCid, accountKey)
-    
-    choice Close_Account: () 
-      controller owner 
-      do 
-        -- remove holdings?
-        -- remove all associated accounts
-        whenSome optCashAccount \(cashAccountFactoryCid, _, cashAccountKey) -> do 
-          exercise cashAccountFactoryCid Account.Remove with account = cashAccountKey 
-        whenSome optNftAccount \(nftAccountFactoryCid, _, _, nftAccountKey) -> do 
-          exercise nftAccountFactoryCid Account.Remove with account = nftAccountKey 
-        pure ()
 
     nonconsuming choice Split : (ContractId Fungible.I, Optional (ContractId Fungible.I))
       with

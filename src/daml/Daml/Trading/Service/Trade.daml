@@ -1,0 +1,114 @@
+module Daml.Trading.Service.Trade where 
+
+import DA.Optional (fromSome)
+import DA.Set  (fromList, singleton)
+import Daml.Finance.Interface.Util.Disclosure qualified as Disclosure (I, AddObservers(..))
+import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
+import Daml.Finance.Interface.Holding.Transferable qualified as Transferable (I, Transfer(..))
+import Daml.Finance.Interface.Holding.Util qualified as Util (getAmount, getInstrument)
+import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (qty)
+import Daml.Finance.Interface.Settlement.Factory qualified as SettlementFactory (I, Instruct(..))
+import Daml.Finance.Interface.Settlement.Batch qualified as Batch (Settle(..))
+import Daml.Finance.Interface.Settlement.Instruction qualified as Instruction (Allocate(..), Approve(..))
+import Daml.Finance.Interface.Settlement.Types (Step(..), Allocation(..), Approval(..))
+import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..), InstrumentKey(..))
+import Daml.Trading.Account.Account qualified as Account (Account, Split(..))
+import Daml.Trading.Nft.Nft qualified as Nft (Nft)
+
+template Trade 
+  with 
+    buyerCashAccKey: AccountKey 
+    sellerNftAccKey: AccountKey 
+    amount: Decimal 
+    nftKey: InstrumentKey 
+    cashCid: ContractId Holding.I 
+    settlementFactoryCid: ContractId SettlementFactory.I 
+  where 
+    signatory buyerCashAccKey.custodian, buyerCashAccKey.owner 
+    observer sellerNftAccKey.owner
+
+    choice Accept: () 
+      controller sellerNftAccKey.owner 
+      do 
+        -- ensure buyer has enough cash
+        cash <- fetch cashCid 
+        let 
+          cashInstrument = Util.getInstrument cash 
+        assertMsg "Balance insufficient" (amount <= Util.getAmount cash)
+        
+        (buyerAccountCid, buyerAccount) <- fetchByKey @Account.Account (buyerCashAccKey.custodian, buyerCashAccKey.owner)
+        (sellerAccountCid, sellerAccount) <- fetchByKey @Account.Account (sellerNftAccKey.custodian, sellerNftAccKey.owner)
+        
+        -- calculate amount of cash seller receives and royalty fee
+        -- and create corresponding holdings
+        (nftCid, nft) <- fetchByKey @Nft.Nft nftKey 
+        (newCashFungibleCid, _) <- exercise buyerAccountCid Account.Split with 
+          holdingCid = cashCid 
+          amount 
+        let 
+          newCashCid = toInterfaceContractId @Holding.I newCashFungibleCid 
+          realTransferAmount = amount * (1.0 - nft.royaltyRate) 
+        (transferFungibleCid, optRoyaltyFungibleCid) <- exercise buyerAccountCid Account.Split with 
+          holdingCid = newCashCid 
+          amount = realTransferAmount
+        let 
+          transferCid = toInterfaceContractId @Holding.I transferFungibleCid 
+          royaltyCid = toInterfaceContractId @Holding.I $ fromSome optRoyaltyFungibleCid 
+
+        -- account key for receiving holdings after trade
+        let
+          buyerNftAccKey = (fromSome buyerAccount.optNftAccount)._4 
+          sellerCashAccKey = (fromSome sellerAccount.optCashAccount)._3 
+
+        -- create unique Id for the trade
+        now <- getTime 
+        let 
+          tradeIdText = show cashInstrument.id <> " - " <> show nftKey.id <> " - " <> show now
+
+        -- creating steps
+          recStep = Step with 
+            sender = sellerNftAccKey.owner 
+            receiver = buyerCashAccKey.owner 
+            quantity = Instrument.qty 1.0 nftKey 
+        
+          payStep = Step with 
+            sender = buyerCashAccKey.owner 
+            receiver = sellerNftAccKey.owner 
+            quantity = Instrument.qty amount cashInstrument 
+        
+        -- daml-finance settlement phase
+        (batchCid, [recInstructionCid, payInstructionCid]) <- exercise settlementFactoryCid SettlementFactory.Instruct with 
+          instructors = fromList [buyerCashAccKey.owner, sellerNftAccKey.owner] 
+          settler = buyerCashAccKey.owner 
+          id = Id tradeIdText 
+          steps = [recStep, payStep] 
+          description = "Settlement for " <> tradeIdText
+        
+        allocatedPayInstructionCid <- exercise payInstructionCid Instruction.Allocate with 
+          allocation = Pledge $ coerceContractId transferCid 
+        
+        approvedPayInstructionCid <- exercise allocatedPayInstructionCid Instruction.Approve with 
+          approval = TakeDelivery sellerCashAccKey 
+
+        allocatedRecInstructionCid <- exercise recInstructionCid Instruction.Allocate with 
+          allocation = Pledge $ coerceContractId nft.nftHoldingCid 
+        
+        approvedRecInstructionCid <- exercise allocatedRecInstructionCid Instruction.Approve with 
+          approval = TakeDelivery buyerNftAccKey 
+        
+        [buyerNftHoldingCid, sellerCashHoldingCid] <- exercise batchCid Batch.Settle 
+
+        -- create Nft wrapper contract for new owner
+        archive nftCid 
+        create nft with 
+          accountKey = buyerNftAccKey 
+          nftHoldingCid = toInterfaceContractId buyerNftHoldingCid 
+          lastPrice = amount 
+        
+        -- transfer royalty fee to admin account
+        let 
+          royaltyTransferableCid: ContractId Transferable.I = coerceContractId royaltyCid
+        exercise royaltyTransferableCid Transferable.Transfer with 
+          newOwnerAccount = AccountKey with custodian = buyerCashAccKey.custodian, owner = buyerCashAccKey.custodian, id = buyerCashAccKey.id 
+
+        pure ()

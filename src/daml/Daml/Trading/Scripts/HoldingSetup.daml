@@ -21,7 +21,7 @@ import Daml.Trading.Scripts.UserSetup qualified as UserSetup (getDefaultParties)
 
 instrumentData = (Id "USD", "0")
 
-initialize : Script CashSetupState
+initialize : Script HoldingSetupState
 initialize = do 
   [public, admin] <- UserSetup.getDefaultParties 
 
@@ -90,4 +90,4 @@ initialize = do
 
   pure (public, admin, cashInstrument, accountFactoryCid, cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid)
 
-type CashSetupState = (Party, Party, InstrumentKey, ContractId Account.F, ContractId Holding.F, ContractId Holding.F, ContractId Instrument.F)
+type HoldingSetupState = (Party, Party, InstrumentKey, ContractId Account.F, ContractId Holding.F, ContractId Holding.F, ContractId Instrument.F)
