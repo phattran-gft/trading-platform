@@ -151,31 +151,32 @@ template Account
       do
         contractBadgeList <- forA badges \badge -> fetch badge
         let
-          badgeResult = filter (\contractBadge -> contractBadge.badge == redeem_badge) contractBadgeList
+          badgeUserResult = filter (\contractBadge -> contractBadge.badge == redeem_badge) contractBadgeList
           currentRewardPoints = rewardPoints
-        if currentRewardPoints >= 20 && null badgeResult && redeem_badge == Badge.Novice_Trader then do
-          newBadge <- create Badge.Badge with 
-            admin = custodian
-            owner = owner
-            badge = redeem_badge
-          accountWithBadgeCid <- create Account with 
-            rewardPoints = currentRewardPoints - 20
-            badges = newBadge :: badges
-            ..
-          pure(accountWithBadgeCid)
-        else do
-          if currentRewardPoints >= 100 && null badgeResult && redeem_badge == Badge.Pro_Trader then do
-            newBadge <- create Badge.Badge with 
-              admin = custodian
-              owner = owner
-              badge = redeem_badge
-            accountWithBadgeCid <- create Account with 
-              rewardPoints = currentRewardPoints - 100
-              badges = newBadge :: badges
-              ..
-            pure(accountWithBadgeCid)
-          else do 
-            if currentRewardPoints >= 1000 && null badgeResult && redeem_badge == Badge.Hall_of_Fame_Trader then do
+        assertMsg "Exists Redeem Badge!" (null badgeUserResult)
+        case (currentRewardPoints, redeem_badge) of
+          (currentRewardPoints, redeem_badge) 
+            | currentRewardPoints >= 20, redeem_badge == Badge.Novice_Trader-> do 
+              newBadge <- create Badge.Badge with 
+                admin = custodian
+                owner = owner
+                badge = redeem_badge
+              accountWithBadgeCid <- create Account with 
+                rewardPoints = currentRewardPoints - 20
+                badges = newBadge :: badges
+                ..
+              pure(accountWithBadgeCid)
+            | currentRewardPoints >= 100, redeem_badge == Badge.Pro_Trader-> do 
+              newBadge <- create Badge.Badge with 
+                admin = custodian
+                owner = owner
+                badge = redeem_badge
+              accountWithBadgeCid <- create Account with 
+                rewardPoints = currentRewardPoints - 100
+                badges = newBadge :: badges
+                ..
+              pure(accountWithBadgeCid)
+            | currentRewardPoints >= 1000, redeem_badge == Badge.Hall_of_Fame_Trader-> do 
               newBadge <- create Badge.Badge with 
                 admin = custodian
                 owner = owner
@@ -185,10 +186,10 @@ template Account
                 badges = newBadge :: badges
                 ..
               pure(accountWithBadgeCid)
-            else do 
+            | otherwise -> do
               (accountCid, account) <- fetchByKey @Account (custodian, owner)
               pure(accountCid)
-
+      
     choice Close_Account: () 
       controller owner 
       do 
