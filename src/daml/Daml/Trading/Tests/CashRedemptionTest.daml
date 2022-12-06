@@ -49,18 +49,18 @@ setup = do
         amount = 1000.0
         holdingCid = adminHoldingCid
 
-  aliceCashHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Credit
+  (aliceCashHoldingCid,adminRemainingOpt) <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Credit
   
   aliceRequestCid2 <- submit alice do
     createCmd CreditCashAccount.UserRequest
       with
         owner = alice
         custodian = admin
-        holdingCid = adminHoldingCid
         instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
         amount = 2000.0
+        holdingCid = fromSome (adminRemainingOpt)
 
-  aliceCashHoldingCid2 <- submit admin do exerciseCmd aliceRequestCid2 CreditCashAccount.Credit
+  (aliceCashHoldingCid2,adminRemainingOpt) <- submit admin do exerciseCmd aliceRequestCid2 CreditCashAccount.Credit
   
   aliceMergeCashHoldingCid <- submit alice do exerciseCmd aliceAccountCid CreateAccount.Merge with holdingCids = [aliceCashHoldingCid,aliceCashHoldingCid2]
 
@@ -151,9 +151,9 @@ setup = do
         custodian = admin
         instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
         amount = 1000.0
-        holdingCid = adminHoldingCid
+        holdingCid = fromSome (adminRemainingOpt)
 
-  bobCashHoldingCid <- submit admin do exerciseCmd bobRequestCid CreditCashAccount.Accept
+  (bobCashHoldingCid,_) <- submit admin do exerciseCmd bobRequestCid CreditCashAccount.Credit
   
   bobMergeCashHoldingCid <- submit bob do exerciseCmd bobAccountCid CreateAccount.Merge with holdingCids = [bobCashHoldingCidremaining,bobCashHoldingCid]
 

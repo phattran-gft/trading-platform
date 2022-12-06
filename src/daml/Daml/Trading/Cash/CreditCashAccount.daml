@@ -50,7 +50,7 @@ template UserRequest
 
     ensure amount > 0.0
 
-    choice Credit :  Optional (ContractId Holding.I)
+    choice Credit : (ContractId Holding.I, Optional (ContractId Holding.I))
       controller custodian
       do
         let
@@ -61,14 +61,14 @@ template UserRequest
             receiverAccount = userAccount
             instrument = instrument
             amount = amount
-            owner = owner
+            owner = custodian
             custodian = custodian
 
         (userHoldingCid, adminRemaining) <- exercise transferRequest CashTransfer.Accept
           with
             holdingCid = holdingCid
 
-        pure(adminRemaining)
+        pure(userHoldingCid,adminRemaining)
     
     choice Reject : ()
       controller custodian
