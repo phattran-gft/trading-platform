@@ -1,55 +1,52 @@
 module Daml.Trading.Tests.BadgeTest where
 
-import Daml.Trading.Account.Account qualified as CreateAccount
 import Daml.Trading.Reward.Badge qualified as Badge
+import Daml.Trading.Account.Account qualified as CreateAccount
+
 import Daml.Script
 
 setup : Script()
 
-setup = script do
+setup = do 
   admin <- allocateParty "Admin"
   alice <- allocateParty "Alice"
   bob <- allocateParty "Bob"
   charlie <- allocateParty "Charlie"
 
-  aliceCreateAccountCid <- submit admin do
-    createCmd CreateAccount.Account
+  aliceRequestCid <- submit alice do
+    createCmd CreateAccount.Request
       with
-        custodian = admin
         owner = alice
+        custodian = admin
         accountType = CreateAccount.Retail 
         username = "alice" 
-        realName = "Alice" 
-        passportNumber = "" 
-        nationalId = "333333" 
-        address  = "Boston" 
-        optCashAccount = None 
-        optNftAccount = None 
-        rewardPoints = 1600
-        badges = []
+        realName = "Alice Ackerson" 
+        passportNumber = "222222" 
+        nationalId = "" 
+        address  = "New York" 
+       
+  aliceAccountCid <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept 
 
   aliceRedeem1 <- submit alice do
-    exerciseCmd aliceCreateAccountCid CreateAccount.Redeem_Badge with 
+    exerciseCmd aliceAccountCid CreateAccount.Redeem_Badge with 
       redeem_badge = Badge.Novice_Trader 
 
-  bobCreateAccountCid <- submit admin do
-    createCmd CreateAccount.Account
+  bobRequestCid <- submit bob do
+    createCmd CreateAccount.Request
       with
-        custodian = admin
         owner = bob
+        custodian = admin
         accountType = CreateAccount.Retail 
-        username = "bọb" 
-        realName = "Bob" 
-        passportNumber = "" 
-        nationalId = "111111" 
-        address  = "Boston" 
-        optCashAccount = None 
-        optNftAccount = None 
-        rewardPoints = 120
-        badges = []
+        username = "bob" 
+        realName = "Bob Ackerson" 
+        passportNumber = "111111" 
+        nationalId = "" 
+        address  = "Canada" 
+
+  bobAccountCid <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
 
   bobRedeem1 <- submit bob do
-    exerciseCmd bobCreateAccountCid CreateAccount.Redeem_Badge with 
+    exerciseCmd bobAccountCid CreateAccount.Redeem_Badge with 
       redeem_badge = Badge.Novice_Trader 
 
   aliceRedeem2 <- submit alice do
