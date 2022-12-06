@@ -55,7 +55,7 @@ setup = script do
     exerciseCmd aliceRedeem1 CreateAccount.Redeem_Badge with 
       redeem_badge = Badge.Pro_Trader
 
-  submitMustFail alice do
+  submit alice do
     exerciseCmd aliceRedeem2 CreateAccount.Redeem_Badge with 
-      redeem_badge = Badge.Novice_Trader
+      redeem_badge = Badge.Hall_of_Fame_Trader
   pure()
