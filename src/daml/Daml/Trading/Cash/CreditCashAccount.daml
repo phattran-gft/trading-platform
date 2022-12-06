@@ -4,9 +4,10 @@ import Daml.Finance.Interface.Holding.Account qualified as Account (Credit(..), 
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K, qty)
 import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
-import Daml.Trading.Account.Account (cashLabel)
+import Daml.Trading.Account.Account qualified as CreateAccount
+import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 
-template Request
+template AdminRequest
   with
     owner: Party 
     custodian: Party 
@@ -22,16 +23,58 @@ template Request
       controller custodian 
       do
         let
-          accountKey = AccountKey with custodian, owner, id = Id cashLabel
+          accountKey = AccountKey with custodian, owner, id = Id CreateAccount.cashLabel
         Account.exerciseInterfaceByKey @Account.I accountKey custodian Account.Credit
           with
             quantity = Instrument.qty amount instrument
-        
 
     choice Decline : ()
       controller custodian
       do pure ()
 
     choice Withdraw : ()
+      controller owner
+      do pure ()
+
+
+template UserRequest
+  with
+    owner: Party 
+    custodian: Party 
+    amount : Decimal
+    instrument : Instrument.K
+  where
+    signatory owner
+    observer custodian
+
+    ensure amount > 0.0
+
+    choice Credit : (ContractId Holding.I, Optional (ContractId Holding.I))
+      with
+        holdingCid : ContractId Holding.I
+      controller custodian
+      do
+        let
+          userAccount = AccountKey with custodian = custodian, owner = owner, id = Id CreateAccount.cashLabel
+
+        transferRequest <- create CashTransfer.Request
+          with
+            receiverAccount = userAccount
+            instrument = instrument
+            amount = amount
+            owner = custodian
+            custodian = custodian
+
+        (userHoldingCid, adminRemaining) <- exercise transferRequest CashTransfer.Accept
+          with
+            holdingCid = holdingCid
+
+        pure(userHoldingCid,adminRemaining)
+    
+    choice Reject : ()
+      controller custodian
+      do pure ()
+
+    choice Remove : ()
       controller owner
       do pure ()
