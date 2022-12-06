@@ -57,7 +57,7 @@ template Request
     nationalId: Text 
     address: Text 
   where 
-    signatory owner 
+    signatory owner
     observer custodian 
 
     choice Request_Accept: ContractId Account 
@@ -165,44 +165,52 @@ template Account
       do
         contractBadgeList <- forA badges \badge -> fetch badge
         let
-          badgeUserResult = filter (\contractBadge -> contractBadge.badge == redeem_badge) contractBadgeList
+          curentbadge = length(contractBadgeList)
+          -- badgeUserResult = filter (\contractBadge -> contractBadge.badge == redeem_badge) contractBadgeList
           currentRewardPoints = rewardPoints
-        assertMsg "Trader already owns this badge!" (null badgeUserResult)
-        case (redeem_badge) of
-          Badge.Novice_Trader -> do 
-            assertMsg "Not enough points" (currentRewardPoints >= 20)
-            newBadge <- create Badge.Badge with 
-              admin = custodian
-              owner = owner
-              badge = redeem_badge
-            accountWithBadgeCid <- create Account with 
-              rewardPoints = currentRewardPoints - 20
-              badges = newBadge :: badges
-              ..
-            pure(accountWithBadgeCid)
-          Badge.Pro_Trader -> do
-            assertMsg "Not enough points" (currentRewardPoints >= 100)
-            newBadge <- create Badge.Badge with 
-              admin = custodian
-              owner = owner
-              badge = redeem_badge
-            accountWithBadgeCid <- create Account with 
-              rewardPoints = currentRewardPoints - 100
-              badges = newBadge :: badges
-              ..
-            pure(accountWithBadgeCid)
-          Badge.Hall_of_Fame_Trader -> do
-            assertMsg "Not enough points" (currentRewardPoints >= 1000)
-            newBadge <- create Badge.Badge with 
-              admin = custodian
-              owner = owner
-              badge = redeem_badge
-            accountWithBadgeCid <- create Account with 
-              rewardPoints = currentRewardPoints - 1000
-              badges = newBadge :: badges
-              ..
-            pure(accountWithBadgeCid)
-           
+        case curentbadge of
+          0 -> do
+            assertMsg "Not enough point" (currentRewardPoints >= 20)
+            assertMsg "Please redeem Novice Trader badge first" (redeem_badge == Badge.Novice_Trader)
+            do
+              newBadge <- create Badge.Badge with 
+                admin = custodian
+                owner = owner
+                badge = redeem_badge
+              accountWithBadgeCid <- create Account with 
+                rewardPoints = currentRewardPoints - 20
+                badges = newBadge :: badges
+                ..
+              pure(accountWithBadgeCid)
+          1 -> do
+            assertMsg "Not enough point" (currentRewardPoints >= 100)
+            assertMsg "Please redeem Pro Trader badge before redeem this one"(redeem_badge == Badge.Pro_Trader)
+            do
+              newBadge <- create Badge.Badge with 
+                admin = custodian
+                owner = owner
+                badge = redeem_badge
+              accountWithBadgeCid <- create Account with 
+                rewardPoints = currentRewardPoints - 100
+                badges = newBadge :: badges
+                ..
+              pure(accountWithBadgeCid)
+          2 -> do
+            assertMsg "Not enough point" (currentRewardPoints >= 1000)
+            assertMsg "Please redeem Pro Trader badge before redeem this one" (redeem_badge == Badge.Hall_of_Fame_Trader)
+            do
+              newBadge <- create Badge.Badge with 
+                admin = custodian
+                owner = owner
+                badge = redeem_badge
+              accountWithBadgeCid <- create Account with 
+                rewardPoints = currentRewardPoints - 1000
+                badges = newBadge :: badges
+                ..
+              pure(accountWithBadgeCid)
+          _ -> do
+            (accountCid, account) <- fetchByKey @Account (custodian, owner)
+            pure(accountCid)
       
     choice Close_Account: () 
       controller owner 

@@ -43,7 +43,7 @@ setup = do
         instrument = cashInstrument
         amount = 1000.0
 
-  (aliceCashHoldingCid,adminRemainingOpt) <- submit admin do 
+  (aliceCashHoldingCid,_) <- submit admin do 
     exerciseCmd aliceRequestCid CreditCashAccount.Credit
       with
         holdingCid = adminHoldingCid
