@@ -1,13 +1,13 @@
 module Daml.Trading.Account.Account where 
 
 import DA.Optional (whenSome, isNone)
-import DA.Map qualified as M (fromList)
 import DA.Set qualified as S (fromList, singleton)
 import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (Create(..), F, Remove(..))
 import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
 import Daml.Finance.Interface.Instrument.Base.Factory qualified as Instrument (F)
 import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
-
+import Daml.Trading.Reward.Badge qualified as Badge
+import DA.Map qualified as M
 import Daml.Finance.Interface.Holding.Util (getAmount)
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..),Merge(..))
@@ -48,7 +48,7 @@ template InstrumentFactoryReference
 
 template Request 
   with 
-    custodian: Party 
+    custodian: Party
     owner: Party 
     accountType: AccountType 
     username: Text 
@@ -75,6 +75,8 @@ template Request
             address 
             optCashAccount = None 
             optNftAccount = None 
+            rewardPoints = 0 
+            badges = []
 
     choice Request_Decline : ()
       controller custodian
@@ -96,8 +98,11 @@ template Account
     address: Text 
     optCashAccount: Optional (ContractId Account.F, ContractId Holding.F, AccountKey) 
     optNftAccount: Optional (ContractId Account.F, ContractId Holding.F, ContractId Instrument.F, AccountKey) 
+    rewardPoints : Int
+    badges : [ContractId Badge.Badge]
   where 
-    signatory custodian, owner 
+    signatory custodian 
+    observer owner
     key (custodian, owner): (Party, Party)
     maintainer key._1 
 
@@ -154,6 +159,52 @@ template Account
         
         create this with optNftAccount = Some (accountFactoryCid, holdingFactoryCid, instrumentFactoryCid, accountKey)
     
+    choice Redeem_Badge: ContractId Account
+      with  
+        redeem_badge: Badge.BadgeType
+      controller owner
+      do
+        contractBadgeList <- forA badges \badge -> fetch badge
+        let
+          badgeUserResult = filter (\contractBadge -> contractBadge.badge == redeem_badge) contractBadgeList
+          currentRewardPoints = rewardPoints
+        assertMsg "Trader already owns this badge!" (null badgeUserResult)
+        case (redeem_badge) of
+          Badge.Novice_Trader -> do 
+            assertMsg "Not enough points" (currentRewardPoints >= 20)
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 20
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
+          Badge.Pro_Trader -> do
+            assertMsg "Not enough points" (currentRewardPoints >= 100)
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 100
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
+          Badge.Hall_of_Fame_Trader -> do
+            assertMsg "Not enough points" (currentRewardPoints >= 1000)
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 1000
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
+           
+      
     choice Close_Account: () 
       controller owner 
       do 
