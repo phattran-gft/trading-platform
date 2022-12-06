@@ -153,42 +153,42 @@ template Account
         let
           badgeUserResult = filter (\contractBadge -> contractBadge.badge == redeem_badge) contractBadgeList
           currentRewardPoints = rewardPoints
-        assertMsg "Exists Redeem Badge!" (null badgeUserResult)
-        case (currentRewardPoints, redeem_badge) of
-          (currentRewardPoints, redeem_badge) 
-            | currentRewardPoints >= 20, redeem_badge == Badge.Novice_Trader-> do 
-              newBadge <- create Badge.Badge with 
-                admin = custodian
-                owner = owner
-                badge = redeem_badge
-              accountWithBadgeCid <- create Account with 
-                rewardPoints = currentRewardPoints - 20
-                badges = newBadge :: badges
-                ..
-              pure(accountWithBadgeCid)
-            | currentRewardPoints >= 100, redeem_badge == Badge.Pro_Trader-> do 
-              newBadge <- create Badge.Badge with 
-                admin = custodian
-                owner = owner
-                badge = redeem_badge
-              accountWithBadgeCid <- create Account with 
-                rewardPoints = currentRewardPoints - 100
-                badges = newBadge :: badges
-                ..
-              pure(accountWithBadgeCid)
-            | currentRewardPoints >= 1000, redeem_badge == Badge.Hall_of_Fame_Trader-> do 
-              newBadge <- create Badge.Badge with 
-                admin = custodian
-                owner = owner
-                badge = redeem_badge
-              accountWithBadgeCid <- create Account with 
-                rewardPoints = currentRewardPoints - 1000
-                badges = newBadge :: badges
-                ..
-              pure(accountWithBadgeCid)
-            | otherwise -> do
-              (accountCid, account) <- fetchByKey @Account (custodian, owner)
-              pure(accountCid)
+        assertMsg "Trader already owns this badge!" (null badgeUserResult)
+        case (redeem_badge) of
+          Badge.Novice_Trader -> do 
+            assertMsg "Not enough points" (currentRewardPoints >= 20)
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 20
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
+          Badge.Pro_Trader -> do
+            assertMsg "Not enough points" (currentRewardPoints >= 100)
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 100
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
+          Badge.Hall_of_Fame_Trader -> do
+            assertMsg "Not enough points" (currentRewardPoints >= 1000)
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 1000
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
+           
       
     choice Close_Account: () 
       controller owner 
