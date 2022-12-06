@@ -1,5 +1,6 @@
 module Daml.Trading.Tests.NFTTest where 
 
+import DA.Set qualified as S (empty)
 import Daml.Script 
 
 import Daml.Finance.Interface.Types.Common (InstrumentKey(..), Id(..))
@@ -66,7 +67,8 @@ setup = do
         pictureDescription = "Picture Description" 
         rarity = Nft.Rare 
         royaltyRate = 0.025 
-        initialPrice = 100.0
+        initialPrice = 100.0 
+        observers = S.empty
 
   aliceNftKey <- submit admin $ exerciseCmd nftIssueRequestCid Nft.Accept 
 

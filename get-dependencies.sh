@@ -15,6 +15,7 @@ dependencies=( \
   "daml-finance-interface-holding" \
   "daml-finance-interface-instrument-base" \
   "daml-finance-interface-settlement" \
+  "daml-finance-interface-util" \
   "daml-finance-interface-types" \
   "daml-finance-lifecycle" \
   "daml-finance-refdata" \
@@ -32,6 +33,7 @@ if [[ ! -a ".lib/daml-finance-interface-lifecycle-0.1.3.dar" ]]; then curl -Lf# 
 if [[ ! -a ".lib/daml-finance-interface-holding-0.1.3.dar" ]]; then curl -Lf# "https://github.com/digital-asset/daml-finance/releases/download/Daml.Finance.Interface.Holding/0.1.3/daml-finance-interface-holding-0.1.3.dar" -o .lib/daml-finance-interface-holding-0.1.3.dar; fi
 if [[ ! -a ".lib/daml-finance-interface-instrument-base-0.1.3.dar" ]]; then curl -Lf# "https://github.com/digital-asset/daml-finance/releases/download/Daml.Finance.Interface.Instrument.Base/0.1.3/daml-finance-interface-instrument-base-0.1.3.dar" -o .lib/daml-finance-interface-instrument-base-0.1.3.dar; fi
 if [[ ! -a ".lib/daml-finance-interface-settlement-0.1.3.dar" ]]; then curl -Lf# "https://github.com/digital-asset/daml-finance/releases/download/Daml.Finance.Interface.Settlement/0.1.3/daml-finance-interface-settlement-0.1.3.dar" -o .lib/daml-finance-interface-settlement-0.1.3.dar; fi
+if [[ ! -a ".lib/daml-finance-interface-util-0.1.3.dar" ]]; then curl -Lf# "https://github.com/digital-asset/daml-finance/releases/download/Daml.Finance.Interface.Util/0.1.3/daml-finance-interface-util-0.1.3.dar" -o .lib/daml-finance-interface-util-0.1.3.dar; fi
 if [[ ! -a ".lib/daml-finance-interface-types-0.1.3.dar" ]]; then curl -Lf# "https://github.com/digital-asset/daml-finance/releases/download/Daml.Finance.Interface.Types/0.1.3/daml-finance-interface-types-0.1.3.dar" -o .lib/daml-finance-interface-types-0.1.3.dar; fi
 if [[ ! -a ".lib/daml-finance-lifecycle-0.1.3.dar" ]]; then curl -Lf# "https://github.com/digital-asset/daml-finance/releases/download/Daml.Finance.Lifecycle/0.1.3/daml-finance-lifecycle-0.1.3.dar" -o .lib/daml-finance-lifecycle-0.1.3.dar; fi
 if [[ ! -a ".lib/daml-finance-refdata-0.1.3.dar" ]]; then curl -Lf# "https://github.com/digital-asset/daml-finance/releases/download/Daml.Finance.RefData/0.1.3/daml-finance-refdata-0.1.3.dar" -o .lib/daml-finance-refdata-0.1.3.dar; fi
