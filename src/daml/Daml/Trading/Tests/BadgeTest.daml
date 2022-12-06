@@ -1,21 +1,22 @@
 module Daml.Trading.Tests.BadgeTest where
 
-import Daml.Trading.Account.Account qualified as CreateAccount
 import Daml.Trading.Reward.Badge qualified as Badge
+import Daml.Trading.Account.Account qualified as CreateAccount
+import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
+import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (initialize) 
 import Daml.Script
 
 setup : Script()
 
-setup = script do
-  admin <- allocateParty "Admin"
-  alice <- allocateParty "Alice"
-  bob <- allocateParty "Bob"
-  charlie <- allocateParty "Charlie"
+setup = do 
+  (public, admin, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid) <- HoldingSetup.initialize 
+  [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
 
-  aliceCreateAccountCid <- submit admin do
+  aliceAccountCid <- submit alice do
     createCmd CreateAccount.Account
       with
-        custodian = admin
+        custodian = alice
         owner = alice
         accountType = CreateAccount.Retail 
         username = "alice" 
@@ -29,16 +30,16 @@ setup = script do
         badges = []
 
   aliceRedeem1 <- submit alice do
-    exerciseCmd aliceCreateAccountCid CreateAccount.Redeem_Badge with 
+    exerciseCmd aliceAccountCid CreateAccount.Redeem_Badge with 
       redeem_badge = Badge.Novice_Trader 
 
-  bobCreateAccountCid <- submit admin do
+  bobCreateAccountCid <- submit bob do
     createCmd CreateAccount.Account
       with
-        custodian = admin
+        custodian = bob
         owner = bob
         accountType = CreateAccount.Retail 
-        username = "bọb" 
+        username = "bob" 
         realName = "Bob" 
         passportNumber = "" 
         nationalId = "111111" 
