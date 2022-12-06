@@ -41,9 +41,8 @@ template UserRequest
   with
     owner: Party 
     custodian: Party 
-    instrument : Instrument.K
     amount : Decimal
-    holdingCid : ContractId Holding.I
+    instrument : Instrument.K
   where
     signatory owner
     observer custodian
@@ -51,6 +50,8 @@ template UserRequest
     ensure amount > 0.0
 
     choice Credit : (ContractId Holding.I, Optional (ContractId Holding.I))
+      with
+        holdingCid : ContractId Holding.I
       controller custodian
       do
         let
