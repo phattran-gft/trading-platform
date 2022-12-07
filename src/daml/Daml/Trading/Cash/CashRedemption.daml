@@ -37,7 +37,7 @@ template WithdrawalRequest
 
         (adminHoldingCid,remaining) <- exercise transferRequest CashTransfer.Accept
           with
-            holdingCid = newburnCid
+            holdingCids = [newburnCid]
         exercise (coerceContractId adminHoldingCid : ContractId Fungible.I) Fungible.ArchiveFungible
        
         pure (remaining)
