@@ -2,7 +2,10 @@ module Daml.Trading.Tests.CashTest where
 
 import Daml.Script 
 
-import Daml.Trading.Account.Account qualified as CreateAccount
+import Daml.Finance.Interface.Types.Common (InstrumentKey(..), AccountKey(..), Id(..))
+
+import Daml.Trading.Account.CreateAccount qualified as CreateAccount
+import Daml.Trading.Account.Account qualified as Account
 import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
 import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (initialize, instrumentData) 
@@ -18,14 +21,14 @@ setup = do
       with
         owner = alice
         custodian = admin
-        accountType = CreateAccount.Retail 
+        accountType = Account.Retail 
         username = "alice" 
         realName = "Alice Ackerson" 
         passportNumber = "222222" 
         nationalId = "" 
         address  = "New York" 
-  aliceAccountCid <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
-  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid CreateAccount.Create_Cash_Account 
+  (aliceAccountCid, _) <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
+  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Cash_Account 
     with 
       description = "Alice Cash Account"
       accountFactoryCid = accountFactoryCid

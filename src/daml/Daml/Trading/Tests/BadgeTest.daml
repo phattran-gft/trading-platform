@@ -1,7 +1,8 @@
 module Daml.Trading.Tests.BadgeTest where
 
 import Daml.Trading.Reward.Badge qualified as Badge
-import Daml.Trading.Account.Account qualified as CreateAccount
+import Daml.Trading.Account.Account qualified as Account
+import Daml.Trading.Account.CreateAccount qualified as CreateAccount
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
 import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (initialize) 
 import Daml.Script
@@ -18,16 +19,16 @@ setup = do
       with
         owner = alice
         custodian = admin
-        accountType = CreateAccount.Retail 
+        accountType = Account.Retail 
         username = "alice" 
         realName = "Alice Ackerson" 
         passportNumber = "222222" 
         nationalId = "" 
         address  = "New York" 
-  aliceAccountCid <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
+  (aliceAccountCid, _) <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
 
   aliceRedeem1 <- submit alice do
-    exerciseCmd aliceAccountCid CreateAccount.Redeem_Badge with 
+    exerciseCmd aliceAccountCid Account.Redeem_Badge with 
       redeem_badge = Badge.Novice_Trader 
 
   bobRequestCid <- submit bob do
@@ -35,24 +36,24 @@ setup = do
       with
         owner = bob
         custodian = admin
-        accountType = CreateAccount.Retail 
+        accountType = Account.Retail 
         username = "bob" 
         realName = "Bob Ackerson" 
         passportNumber = "111111" 
         nationalId = "" 
         address  = "Canada" 
-  bobAccountCid <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
+  (bobAccountCid, _) <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
 
   bobRedeem1 <- submit bob do
-    exerciseCmd bobAccountCid CreateAccount.Redeem_Badge with 
+    exerciseCmd bobAccountCid Account.Redeem_Badge with 
       redeem_badge = Badge.Novice_Trader 
 
   aliceRedeem2 <- submit alice do
-    exerciseCmd aliceRedeem1 CreateAccount.Redeem_Badge with 
+    exerciseCmd aliceRedeem1 Account.Redeem_Badge with 
       redeem_badge = Badge.Pro_Trader
 
   submit alice do
-    exerciseCmd aliceRedeem2 CreateAccount.Redeem_Badge with 
+    exerciseCmd aliceRedeem2 Account.Redeem_Badge with 
       redeem_badge = Badge.Hall_of_Fame_Trader
 
   pure()

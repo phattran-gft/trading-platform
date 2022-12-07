@@ -1,7 +1,8 @@
 module Daml.Trading.Nft.Nft where
 
 import DA.Optional (fromSome)
-import DA.Map (empty)
+import DA.Set qualified as S 
+import DA.Map (fromList)
 
 import Daml.Finance.Interface.Holding.Account qualified as Account (Credit(..), I, exerciseInterfaceByKey)
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
@@ -33,6 +34,7 @@ template Request
     rarity: Rarity
     royaltyRate: Decimal 
     initialPrice: Decimal 
+    observers: S.Set Party 
   where
     signatory owner
     observer admin
@@ -54,12 +56,12 @@ template Request
           instrument = instrumentKey 
           description = pictureDescription 
           validAsOf = now 
-          observers = empty
+          observers = fromList [("InstrumentObserver", S.singleton $ observers)]
         
         nftHoldingCid <- Account.exerciseInterfaceByKey @Account.I accountKey admin Account.Credit
           with
             quantity = Instrument.qty amount instrumentKey
-        
+
         create Nft with 
           instrumentKey 
           accountKey 
@@ -71,6 +73,7 @@ template Request
           royaltyRate 
           issued = now 
           lastPrice = initialPrice 
+          observers
         
         pure (instrumentKey)
 
@@ -94,8 +97,10 @@ template Nft
     royaltyRate: Decimal 
     issued: Time 
     lastPrice: Decimal 
+    observers: S.Set Party 
   where 
     signatory accountKey.custodian, accountKey.owner 
+    observer observers
     -- since each instrumentKey is associated with 1 nft only, we use instrumentKey as key
     key instrumentKey: Instrument.K 
     maintainer key.issuer 

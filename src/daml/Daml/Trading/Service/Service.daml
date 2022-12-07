@@ -1,0 +1,48 @@
+module Daml.Trading.Service.Service where 
+
+import DA.Optional (whenSome)
+import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..), InstrumentKey(..))
+import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (Remove(..))
+import Daml.Finance.Interface.Settlement.Factory qualified as SettlementFactory (I)
+import Daml.Trading.Account.Account qualified as Account (nftLabel, Account(..))
+import Daml.Trading.Service.Trade qualified as Trade 
+
+-- this is created because we cannot put Create_Trade choice directly in Account 
+-- due to circular import
+template Service 
+  with 
+    custodian: Party 
+    owner: Party 
+  where 
+    signatory custodian, owner 
+    key (custodian, owner): (Party, Party) 
+    maintainer key._1
+
+    nonconsuming choice Create_Trade: ContractId Trade.Trade 
+      with 
+        buyerCashAccKey: AccountKey 
+        amount: Decimal 
+        cashInstrument: InstrumentKey 
+        nftKey: InstrumentKey 
+        settlementFactoryCid: ContractId SettlementFactory.I 
+      
+      controller owner 
+      do 
+        let 
+          sellerNftAccKey = AccountKey with custodian, owner, id = Id Account.nftLabel 
+        create Trade.Trade with 
+          alreadyAgreed = []
+          ..
+        
+    choice Close_Account: () 
+      controller owner 
+      do 
+        -- remove holdings?
+        -- remove all associated accounts
+        (accountCid, account) <- fetchByKey @Account.Account (custodian, owner) 
+        whenSome account.optCashAccount \(cashAccountFactoryCid, _, cashAccountKey) -> do 
+          exercise cashAccountFactoryCid Account.Remove with account = cashAccountKey 
+        whenSome account.optNftAccount \(nftAccountFactoryCid, _, _, nftAccountKey) -> do 
+          exercise nftAccountFactoryCid Account.Remove with account = nftAccountKey 
+        archive accountCid 
+        pure ()
