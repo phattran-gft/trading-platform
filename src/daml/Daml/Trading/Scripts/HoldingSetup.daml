@@ -124,7 +124,7 @@ initialize = do
         custodian = admin
         instrument = cashInstrument
         amount = 100000000.0
-  adminHoldingCid <- submit admin do exerciseCmd adminCreditCid CreditCashAccount.Accept
+  adminHoldingCid <- submit admin $ exerciseCmd adminCreditCid CreditCashAccount.Accept
 
   pure (public, admin, cashInstrument, accountFactoryCid, cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid)
 
