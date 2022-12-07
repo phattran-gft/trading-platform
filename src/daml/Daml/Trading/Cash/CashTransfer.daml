@@ -8,7 +8,6 @@ import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument
 import Daml.Finance.Interface.Types.Common (AccountKey(..))
 import Daml.Trading.Account.Account qualified as CreateAccount
 
-
 template Request
   with
     custodian : Party

@@ -19,12 +19,13 @@ import Daml.Finance.Instrument.Base.Instrument (Instrument(..))
 
 import Daml.Trading.Account.Account (AccountFactoryReference(..), HoldingFactoryReference(..), InstrumentFactoryReference(..), nftLabel)
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (getDefaultParties)
-import Daml.Trading.Account.Account qualified as CreateAccount
+import Daml.Trading.Account.Account qualified as Account
+import Daml.Trading.Account.CreateAccount qualified as CreateAccount
 import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
 
 instrumentData = (Id "USD", "0")
 
-initialize : Script CashSetupState
+initialize : Script HoldingSetupState
 initialize = do 
   [public, admin] <- UserSetup.getDefaultParties 
 
@@ -96,26 +97,26 @@ initialize = do
       with 
         owner = admin 
         custodian = admin 
-        accountType = CreateAccount.Admin 
+        accountType = Account.Admin 
         username = "admin" 
         realName = "Platform Admin" 
         passportNumber = "111111" 
         nationalId = "" 
         address  = "Unknown" 
-  adminAccountCid <- submit admin $ exerciseCmd adminRequestCid CreateAccount.Request_Accept 
-  adminAccountCid <- submit admin $ exerciseCmd adminAccountCid CreateAccount.Create_Cash_Account 
+  (adminAccountCid, _) <- submit admin $ exerciseCmd adminRequestCid CreateAccount.Request_Accept 
+  adminAccountCid <- submit admin $ exerciseCmd adminAccountCid Account.Create_Cash_Account 
     with 
       description = "Admin Cash Account" 
       accountFactoryCid
       holdingFactoryCid = cashHoldingFactoryCid
-      observers = [] 
-  adminAccountCid <- submit admin $ exerciseCmd adminAccountCid CreateAccount.Create_Nft_Account 
+      observers = [public] 
+  adminAccountCid <- submit admin $ exerciseCmd adminAccountCid Account.Create_Nft_Account 
     with 
       description = "Admin Nft Account" 
       accountFactoryCid
       holdingFactoryCid = nftHoldingFactoryCid
       instrumentFactoryCid
-      observers = [] 
+      observers = [public] 
 
   adminCreditCid <- submit admin do
     createCmd CreditCashAccount.AdminRequest
@@ -128,4 +129,4 @@ initialize = do
 
   pure (public, admin, cashInstrument, accountFactoryCid, cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid)
 
-type CashSetupState = (Party, Party, InstrumentKey, ContractId Account.F, ContractId Holding.F, ContractId Holding.F, ContractId Instrument.F, ContractId Holding.I)
+type HoldingSetupState = (Party, Party, InstrumentKey, ContractId Account.F, ContractId Holding.F, ContractId Holding.F, ContractId Instrument.F, ContractId Holding.I)
