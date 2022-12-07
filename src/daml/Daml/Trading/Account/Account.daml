@@ -165,52 +165,45 @@ template Account
       do
         contractBadgeList <- forA badges \badge -> fetch badge
         let
-          curentbadge = length(contractBadgeList)
-          -- badgeUserResult = filter (\contractBadge -> contractBadge.badge == redeem_badge) contractBadgeList
           currentRewardPoints = rewardPoints
-        case curentbadge of
-          0 -> do
-            assertMsg "Not enough point" (currentRewardPoints >= 20)
-            assertMsg "Please redeem Novice Trader badge first" (redeem_badge == Badge.Novice_Trader)
-            do
-              newBadge <- create Badge.Badge with 
-                admin = custodian
-                owner = owner
-                badge = redeem_badge
-              accountWithBadgeCid <- create Account with 
-                rewardPoints = currentRewardPoints - 20
-                badges = newBadge :: badges
-                ..
-              pure(accountWithBadgeCid)
-          1 -> do
-            assertMsg "Not enough point" (currentRewardPoints >= 100)
-            assertMsg "Please redeem Pro Trader badge before redeem this one"(redeem_badge == Badge.Pro_Trader)
-            do
-              newBadge <- create Badge.Badge with 
-                admin = custodian
-                owner = owner
-                badge = redeem_badge
-              accountWithBadgeCid <- create Account with 
-                rewardPoints = currentRewardPoints - 100
-                badges = newBadge :: badges
-                ..
-              pure(accountWithBadgeCid)
-          2 -> do
-            assertMsg "Not enough point" (currentRewardPoints >= 1000)
-            assertMsg "Please redeem Pro Trader badge before redeem this one" (redeem_badge == Badge.Hall_of_Fame_Trader)
-            do
-              newBadge <- create Badge.Badge with 
-                admin = custodian
-                owner = owner
-                badge = redeem_badge
-              accountWithBadgeCid <- create Account with 
-                rewardPoints = currentRewardPoints - 1000
-                badges = newBadge :: badges
-                ..
-              pure(accountWithBadgeCid)
-          _ -> do
-            (accountCid, account) <- fetchByKey @Account (custodian, owner)
-            pure(accountCid)
+          badgeTypeListUser = map (\contractBadge -> contractBadge.badge) contractBadgeList
+        assertMsg "Trader already owns this badge!" (redeem_badge `notElem` badgeTypeListUser)
+        case (redeem_badge) of
+          Badge.Novice_Trader -> do 
+            assertMsg "Not enough points" (currentRewardPoints >= 20)
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 20
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
+          Badge.Pro_Trader -> do
+            assertMsg "Not enough points" (currentRewardPoints >= 100)
+            assertMsg "Please redeem Novice Trader badge before redeem this one"(Badge.Novice_Trader `elem` badgeTypeListUser)
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 100
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
+          Badge.Hall_of_Fame_Trader -> do
+            assertMsg "Not enough points" (currentRewardPoints >= 1000)
+            assertMsg "Please redeem Pro Trader badge before redeem this one"(Badge.Pro_Trader `elem` badgeTypeListUser)
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 1000
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
       
     choice Close_Account: () 
       controller owner 
