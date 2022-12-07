@@ -3,14 +3,15 @@ module Daml.Trading.Account.Account where
 import DA.Optional (isNone)
 import DA.Map qualified as M (fromList)
 import DA.Set qualified as S (fromList, singleton)
-import DA.List (head)
+import DA.List (head, tail)
 import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (Create(..), F)
 import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
 import Daml.Finance.Interface.Instrument.Base.Factory qualified as Instrument (F)
 import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
 import Daml.Finance.Interface.Holding.Util (getAmount)
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
-import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..))
+import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..),Merge(..))
+import Daml.Trading.Reward.Badge qualified as Badge
 
 cashLabel = "Cash"
 nftLabel = "Nft"
@@ -57,8 +58,10 @@ template Account
     address: Text 
     optCashAccount: Optional (ContractId Account.F, ContractId Holding.F, AccountKey) 
     optNftAccount: Optional (ContractId Account.F, ContractId Holding.F, ContractId Instrument.F, AccountKey) 
+    rewardPoints : Int
+    badges : [ContractId Badge.Badge]
   where 
-    signatory custodian, owner 
+    signatory custodian, owner
     key (custodian, owner): (Party, Party)
     maintainer key._1 
 
@@ -114,8 +117,55 @@ template Account
           observers = M.fromList [("AccountObservers", observersSet)]
         
         create this with optNftAccount = Some (accountFactoryCid, holdingFactoryCid, instrumentFactoryCid, accountKey)
+    
+    choice Redeem_Badge: ContractId Account
+      with  
+        redeem_badge: Badge.BadgeType
+      controller owner
+      do
+        contractBadgeList <- forA badges \badge -> fetch badge
+        let
+          currentRewardPoints = rewardPoints
+          badgeTypeListUser = map (\contractBadge -> contractBadge.badge) contractBadgeList
+        assertMsg "Trader already owns this badge!" (redeem_badge `notElem` badgeTypeListUser)
+        case (redeem_badge) of
+          Badge.Novice_Trader -> do 
+            assertMsg "Not enough points" (currentRewardPoints >= 20)
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 20
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
+          Badge.Pro_Trader -> do
+            assertMsg "Not enough points" (currentRewardPoints >= 100)
+            assertMsg "Please redeem Novice Trader badge before redeem this one"(Badge.Novice_Trader `elem` badgeTypeListUser)
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 100
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
+          Badge.Hall_of_Fame_Trader -> do
+            assertMsg "Not enough points" (currentRewardPoints >= 1000)
+            assertMsg "Please redeem Pro Trader badge before redeem this one"(Badge.Pro_Trader `elem` badgeTypeListUser)
+            newBadge <- create Badge.Badge with 
+              admin = custodian
+              owner = owner
+              badge = redeem_badge
+            accountWithBadgeCid <- create Account with 
+              rewardPoints = currentRewardPoints - 1000
+              badges = newBadge :: badges
+              ..
+            pure(accountWithBadgeCid)
 
-    nonconsuming choice Split : (ContractId Fungible.I, Optional (ContractId Fungible.I))
+    nonconsuming choice Split : (ContractId Holding.I, Optional (ContractId Holding.I))
       with
         holdingCid : ContractId Holding.I
         amount: Decimal
@@ -126,7 +176,23 @@ template Account
         let
           fungibleCid : ContractId Fungible.I = coerceContractId holdingCid
         Fungible.SplitResult{splitCids,rest} <- exercise fungibleCid Fungible.Split with amounts = [amount]
-        pure (head (splitCids), rest)
+        let
+          splitholdingCid = coerceContractId (head (splitCids))
+          restholdingCid =  coerceContractId <$> rest
+        pure (splitholdingCid, restholdingCid)
+
+    nonconsuming choice Merge : ContractId Holding.I
+      with
+        holdingCids : [ContractId Holding.I]
+      controller owner
+      do
+        let
+          fungibleCids : [ContractId Fungible.I] = map (\hCid -> coerceContractId hCid) holdingCids
+        mergeFungible <- exercise (head(fungibleCids)) Fungible.Merge with fungibleCids = tail(fungibleCids)
+        let
+          mergeholding = coerceContractId mergeFungible
+        pure (mergeholding)
+
 
 -- we use custodian Party as admin for simplicity
 data AccountType 

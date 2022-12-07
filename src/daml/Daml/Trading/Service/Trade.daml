@@ -143,12 +143,12 @@ template TradeSettlement
             let 
               newCashCid = toInterfaceContractId @Holding.I newCashFungibleCid 
               realTransferAmount = calTransferAmount amount nftTuple._2.royaltyRate 
-            (transferFungibleCid, optRoyaltyFungibleCid) <- exercise buyerAccountCid Account.Split with 
+            (transferHoldingCid, optRoyaltyHoldingCid) <- exercise buyerAccountCid Account.Split with 
               holdingCid = newCashCid 
               amount = realTransferAmount
             let 
-              transferCid = toInterfaceContractId @Transferable.I transferFungibleCid 
-              royaltyCid = toInterfaceContractId @Holding.I $ fromSome optRoyaltyFungibleCid 
+              transferCid: ContractId Transferable.I = coerceContractId transferHoldingCid 
+              royaltyCid = toInterfaceContractId @Holding.I $ fromSome optRoyaltyHoldingCid 
 
             -- allocate payment to instruction and 
             -- save royalty holding cid for transferring to admin later

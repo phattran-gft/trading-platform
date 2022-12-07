@@ -1,0 +1,59 @@
+module Daml.Trading.Tests.BadgeTest where
+
+import Daml.Trading.Reward.Badge qualified as Badge
+import Daml.Trading.Account.Account qualified as Account
+import Daml.Trading.Account.CreateAccount qualified as CreateAccount
+import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
+import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (initialize) 
+import Daml.Script
+
+setup : Script()
+
+setup = do 
+  (public, admin, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid) <- HoldingSetup.initialize 
+  [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
+
+  aliceRequestCid <- submit alice do
+    createCmd CreateAccount.Request
+      with
+        owner = alice
+        custodian = admin
+        accountType = Account.Retail 
+        username = "alice" 
+        realName = "Alice Ackerson" 
+        passportNumber = "222222" 
+        nationalId = "" 
+        address  = "New York" 
+  (aliceAccountCid, _) <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
+
+  aliceRedeem1 <- submit alice do
+    exerciseCmd aliceAccountCid Account.Redeem_Badge with 
+      redeem_badge = Badge.Novice_Trader 
+
+  bobRequestCid <- submit bob do
+    createCmd CreateAccount.Request
+      with
+        owner = bob
+        custodian = admin
+        accountType = Account.Retail 
+        username = "bob" 
+        realName = "Bob Ackerson" 
+        passportNumber = "111111" 
+        nationalId = "" 
+        address  = "Canada" 
+  (bobAccountCid, _) <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
+
+  bobRedeem1 <- submit bob do
+    exerciseCmd bobAccountCid Account.Redeem_Badge with 
+      redeem_badge = Badge.Novice_Trader 
+
+  aliceRedeem2 <- submit alice do
+    exerciseCmd aliceRedeem1 Account.Redeem_Badge with 
+      redeem_badge = Badge.Pro_Trader
+
+  submit alice do
+    exerciseCmd aliceRedeem2 Account.Redeem_Badge with 
+      redeem_badge = Badge.Hall_of_Fame_Trader
+
+  pure()

@@ -6,6 +6,7 @@ import Daml.Script
 
 import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (F)
 import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
+import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Instrument.Base.Factory qualified as Instrument (F)
 import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (I)
 import Daml.Finance.Interface.Types.Common (Id(..), InstrumentKey(..))
@@ -18,6 +19,9 @@ import Daml.Finance.Instrument.Base.Instrument (Instrument(..))
 
 import Daml.Trading.Account.Account (AccountFactoryReference(..), HoldingFactoryReference(..), InstrumentFactoryReference(..), nftLabel)
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (getDefaultParties)
+import Daml.Trading.Account.Account qualified as Account
+import Daml.Trading.Account.CreateAccount qualified as CreateAccount
+import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
 
 instrumentData = (Id "USD", "0")
 
@@ -88,6 +92,41 @@ initialize = do
 
   let cashInstrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
 
-  pure (public, admin, cashInstrument, accountFactoryCid, cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid)
+  adminRequestCid <- submit admin do 
+    createCmd CreateAccount.Request 
+      with 
+        owner = admin 
+        custodian = admin 
+        accountType = Account.Admin 
+        username = "admin" 
+        realName = "Platform Admin" 
+        passportNumber = "111111" 
+        nationalId = "" 
+        address  = "Unknown" 
+  (adminAccountCid, _) <- submit admin $ exerciseCmd adminRequestCid CreateAccount.Request_Accept 
+  adminAccountCid <- submit admin $ exerciseCmd adminAccountCid Account.Create_Cash_Account 
+    with 
+      description = "Admin Cash Account" 
+      accountFactoryCid
+      holdingFactoryCid = cashHoldingFactoryCid
+      observers = [public] 
+  adminAccountCid <- submit admin $ exerciseCmd adminAccountCid Account.Create_Nft_Account 
+    with 
+      description = "Admin Nft Account" 
+      accountFactoryCid
+      holdingFactoryCid = nftHoldingFactoryCid
+      instrumentFactoryCid
+      observers = [public] 
 
-type HoldingSetupState = (Party, Party, InstrumentKey, ContractId Account.F, ContractId Holding.F, ContractId Holding.F, ContractId Instrument.F)
+  adminCreditCid <- submit admin do
+    createCmd CreditCashAccount.AdminRequest
+      with
+        owner = admin
+        custodian = admin
+        instrument = cashInstrument
+        amount = 100000000.0
+  adminHoldingCid <- submit admin $ exerciseCmd adminCreditCid CreditCashAccount.Accept
+
+  pure (public, admin, cashInstrument, accountFactoryCid, cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid)
+
+type HoldingSetupState = (Party, Party, InstrumentKey, ContractId Account.F, ContractId Holding.F, ContractId Holding.F, ContractId Instrument.F, ContractId Holding.I)

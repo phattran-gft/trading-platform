@@ -43,8 +43,7 @@ template Request
             newOwnerAccount = receiverAccount
         let
           lastTransferableCid : ContractId Holding.I = coerceContractId newTransferableCid
-          remainingCid = coerceContractId  <$> remainingOpt
-        pure (lastTransferableCid,remainingCid)
+        pure (lastTransferableCid,remainingOpt)
 
     choice Decline : ()
       controller owner

@@ -14,27 +14,9 @@ import DA.Optional (fromSome)
 
 setup: Script ()
 setup = do 
-  (public, admin, cashInstrument, accountFactoryCid, cashHoldingFactoryCid, nftHoldingFactoryCid) <- CashSetup.initialize 
+  (public, admin, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid) <- HoldingSetup.initialize 
   [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
-
-  adminRequestCid <- submit admin do 
-    createCmd CreateAccount.Request 
-      with 
-        owner = admin 
-        custodian = admin 
-        accountType = Account.Admin 
-        username = "admin" 
-        realName = "Platform Admin" 
-        passportNumber = "111111" 
-        nationalId = "" 
-        address  = "Unknown" 
-  adminAccountCid <- submit admin $ exerciseCmd adminRequestCid CreateAccount.Request_Accept 
-  adminBurnAccountCid <- submit admin $ exerciseCmd adminAccountCid Account.Create_Cash_Account 
-    with 
-      description = "Admin Cash Burn Account" 
-      accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid
-      observers = [] 
   
   aliceRequestCid <- submit alice do
     createCmd CreateAccount.Request
@@ -47,7 +29,7 @@ setup = do
         passportNumber = "222222" 
         nationalId = "" 
         address  = "New York" 
-  aliceAccountCid <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
+  (aliceAccountCid, _) <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
   aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Cash_Account 
     with 
       description = "Alice Cash Account"
@@ -60,21 +42,39 @@ setup = do
     adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id Account.cashLabel
   
   aliceRequestCid <- submit alice do
-    createCmd CreditCashAccount.Request
+    createCmd CreditCashAccount.UserRequest
       with
         owner = alice
         custodian = admin
         instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
         amount = 1000.0
 
-  aliceCashHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
+  (aliceCashHoldingCid,adminRemainingOpt) <- submit admin do 
+    exerciseCmd aliceRequestCid CreditCashAccount.Credit
+      with
+        holdingCid = adminHoldingCid
+  
+  aliceRequestCid2 <- submit alice do
+    createCmd CreditCashAccount.UserRequest
+      with
+        owner = alice
+        custodian = admin
+        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
+        amount = 2000.0
+
+  (aliceCashHoldingCid2,adminRemainingOpt) <- submit admin do 
+    exerciseCmd aliceRequestCid2 CreditCashAccount.Credit
+      with
+        holdingCid = fromSome (adminRemainingOpt)
+  
+  aliceMergeCashHoldingCid <- submit alice do exerciseCmd aliceAccountCid Account.Merge with holdingCids = [aliceCashHoldingCid,aliceCashHoldingCid2]
 
   aliceRequestWithdrawal <- submit alice do
     createCmd CashRedemption.WithdrawalRequest
       with 
         custodian = admin
         owner = alice
-        holdingCid = aliceCashHoldingCid
+        holdingCid = aliceMergeCashHoldingCid
         amount = 600.0
         instrument = cashInstrument
 
@@ -110,7 +110,7 @@ setup = do
         passportNumber = "" 
         nationalId = "333333" 
         address  = "Boston" 
-  bobAccountCid <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
+  (bobAccountCid, _) <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
   bobAccountCid <- submit admin $ exerciseCmd bobAccountCid Account.Create_Cash_Account 
     with 
       description = "Bob Cash Account"
@@ -143,7 +143,25 @@ setup = do
         amount = 130.0
         instrument = cashInstrument
 
-  bobCashHoldingCidremaining <- submit admin do 
+  bobCashHoldingCidremainingOpt <- submit admin do 
     exerciseCmd bobRequestWithdrawal CashRedemption.Accept
+
+  let
+    bobCashHoldingCidremaining = fromSome bobCashHoldingCidremainingOpt
+
+  bobRequestCid <- submit bob do
+    createCmd CreditCashAccount.UserRequest
+      with
+        owner = bob
+        custodian = admin
+        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
+        amount = 1000.0
+
+  (bobCashHoldingCid,_) <- submit admin do 
+    exerciseCmd bobRequestCid CreditCashAccount.Credit
+      with
+        holdingCid = fromSome (adminRemainingOpt)
   
+  bobMergeCashHoldingCid <- submit bob do exerciseCmd bobAccountCid Account.Merge with holdingCids = [bobCashHoldingCidremaining,bobCashHoldingCid]
+
   pure()

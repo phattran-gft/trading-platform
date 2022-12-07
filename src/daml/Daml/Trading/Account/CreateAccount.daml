@@ -36,6 +36,8 @@ template Request
             address 
             optCashAccount = None 
             optNftAccount = None 
+            rewardPoints = 0 
+            badges = []
         pure (accountCid, serviceCid)
 
     choice Request_Decline : ()
