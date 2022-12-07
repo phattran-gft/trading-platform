@@ -25,17 +25,20 @@ template Request
 
     choice Accept : (ContractId Holding.I, Optional (ContractId Holding.I))
       with
-        holdingCid : ContractId Holding.I
+        holdingCids : [ContractId Holding.I]
       controller owner
       do
-        holding <- fetch holdingCid
+        -- TODO Merge
+        (accountCid,_) <- fetchByKey @CreateAccount.Account (custodian, owner)
+        mergeholdingCid <- exercise accountCid CreateAccount.Merge with holdingCids = holdingCids
+
+        holding <- fetch mergeholdingCid
         getInstrument holding === instrument
         assertMsg "Balance insufficient" (amount <= getAmount holding)
         
-        (accountCid,_) <- fetchByKey @CreateAccount.Account (custodian, owner)
         (transferCid,remainingOpt) <- exercise accountCid CreateAccount.Split
           with
-            holdingCid = holdingCid
+            holdingCid = mergeholdingCid
             amount = amount
         let
           transferableCid : ContractId Transferable.I = coerceContractId transferCid

@@ -101,8 +101,7 @@ template Account
     rewardPoints : Int
     badges : [ContractId Badge.Badge]
   where 
-    signatory custodian 
-    observer owner
+    signatory custodian, owner
     key (custodian, owner): (Party, Party)
     maintainer key._1 
 
