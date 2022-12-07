@@ -5,7 +5,6 @@ import Daml.Script
 import Daml.Finance.Interface.Types.Common (InstrumentKey(..), AccountKey(..), Id(..))
 import Daml.Trading.Account.CreateAccount qualified as CreateAccount
 import Daml.Trading.Account.Account qualified as Account
-import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
 import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
 import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (initialize, instrumentData) 
@@ -114,14 +113,14 @@ shouldFailOnBalanceCheck = do
       with
         owner = alice
         custodian = admin
-        accountType = CreateAccount.Retail 
+        accountType = Account.Retail 
         username = "alice" 
         realName = "Alice Ackerson" 
         passportNumber = "222222" 
         nationalId = "" 
         address  = "New York" 
-  aliceAccountCid <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
-  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid CreateAccount.Create_Cash_Account 
+  (aliceAccountCid, _) <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
+  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Cash_Account 
     with 
       description = "Alice Cash Account"
       accountFactoryCid = accountFactoryCid
@@ -129,8 +128,8 @@ shouldFailOnBalanceCheck = do
       observers = []
   let 
     (instrumentId, instrumentVersion) = HoldingSetup.instrumentData
-    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id CreateAccount.cashLabel
-    adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id CreateAccount.cashLabel
+    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id Account.cashLabel
+    adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id Account.cashLabel
   
   aliceRequestCid <- submit alice do
     createCmd CreditCashAccount.UserRequest

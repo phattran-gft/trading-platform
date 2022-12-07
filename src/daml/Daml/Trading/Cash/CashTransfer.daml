@@ -27,10 +27,9 @@ template Request
         holdingCids : [ContractId Holding.I]
       controller owner
       do
-        -- TODO Merge
+        -- Merge holding before transfer
         (accountCid,_) <- fetchByKey @CreateAccount.Account (custodian, owner)
         mergeholdingCid <- exercise accountCid CreateAccount.Merge with holdingCids = holdingCids
-
         holding <- fetch mergeholdingCid
         getInstrument holding === instrument
         assertMsg "Balance insufficient" (amount <= getAmount holding)
