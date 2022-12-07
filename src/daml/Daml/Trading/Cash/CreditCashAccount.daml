@@ -67,7 +67,7 @@ template UserRequest
 
         (userHoldingCid, adminRemaining) <- exercise transferRequest CashTransfer.Accept
           with
-            holdingCid = holdingCid
+            holdingCids = [holdingCid]
 
         pure(userHoldingCid,adminRemaining)
     
