@@ -1,5 +1,7 @@
 module Daml.Trading.Reward.TradingPoint where 
 
+import Daml.Trading.Account.Account qualified as Account
+
 calPointAndAmountRemain : Decimal -> (Int, Decimal)
 calPointAndAmountRemain tradeAmount = (point, tradePointRemain)
   where 
@@ -17,14 +19,14 @@ template TradeSuccess
     signatory admin
     observer seller, buyer
     ensure seller /= buyer
-    choice IssueRewardPoint : (ContractId TradingPoint, ContractId TradingPoint)
+    choice IssueRewardPoint : (ContractId Account.Account, ContractId Account.Account)
       controller admin
       do  
-        (sellerTradingPointCid, sellerTradingPoint) <- fetchByKey @TradingPoint (admin, seller)
-        (buyerTradingPointCid, buyerTradingPoint) <- fetchByKey @TradingPoint (admin, buyer)
+        (sellerTradingPointCid, sellerTradingPoint) <- fetchByKey @Account.Account (admin, seller)
+        (buyerTradingPointCid, buyerTradingPoint) <- fetchByKey @Account.Account (admin, buyer)
         let       
-          oldSellerTradingPoint = sellerTradingPoint.quantity
-          oldBuyerTradingPoint = buyerTradingPoint.quantity
+          oldSellerTradingPoint = sellerTradingPoint.rewardPoints
+          oldBuyerTradingPoint = buyerTradingPoint.rewardPoints
           oldSellerTradeAmountRemain = sellerTradingPoint.tradeAmountRemain
           oldBuyerTradeAmountRemain = buyerTradingPoint.tradeAmountRemain
           (quantityPointBaseTradeAmount, tradeAmountRemainBaseTradeAmount) = calPointAndAmountRemain tradeAmount
@@ -42,32 +44,39 @@ template TradeSuccess
           sellerAmountRemain = tradeAmountRemainSeller
           buyerAmountRemain = tradeAmountRemainBuyer
               
-        archive buyerTradingPointCid
-        archive sellerTradingPointCid
-
-        seller <- create TradingPoint with 
-            admin = admin
-            holderRewardPoint = seller
-            quantity = sellerRewardPoint
-            tradeAmountRemain = sellerAmountRemain
-        buyer <- create TradingPoint with 
-            admin = admin
-            holderRewardPoint = buyer
-            quantity = buyerRewardPoint
-            tradeAmountRemain = buyerAmountRemain 
+        
+        seller <- exercise sellerTradingPointCid Account.UpdateRewardPoints with
+          input_rewardPoints = sellerRewardPoint
+          input_tradeAmountRemain = sellerAmountRemain
+          ..
+          
+        buyer <- exercise buyerTradingPointCid Account.UpdateRewardPoints with
+          input_rewardPoints = buyerRewardPoint
+          input_tradeAmountRemain = buyerAmountRemain
+          ..
+        -- seller <- create TradingPoint with 
+        --     admin = admin
+        --     holderRewardPoint = seller
+        --     quantity = sellerRewardPoint
+        --     tradeAmountRemain = sellerAmountRemain
+        -- buyer <- create TradingPoint with 
+        --     admin = admin
+        --     holderRewardPoint = buyer
+        --     quantity = buyerRewardPoint
+        --     tradeAmountRemain = buyerAmountRemain 
         pure (seller, buyer)
 
-template TradingPoint
-  with
-    admin : Party
-    holderRewardPoint : Party
-    quantity : Int
-    tradeAmountRemain : Decimal
-  where
-    signatory admin
-    observer holderRewardPoint
-    key (admin, holderRewardPoint) : (Party, Party)
-    maintainer key._1
+-- template TradingPoint
+--   with
+--     admin : Party
+--     holderRewardPoint : Party
+--     quantity : Int
+--     tradeAmountRemain : Decimal
+--   where
+--     signatory admin
+--     observer holderRewardPoint
+--     key (admin, holderRewardPoint) : (Party, Party)
+--     maintainer key._1
 
 
 

@@ -59,6 +59,7 @@ template Account
     optCashAccount: Optional (ContractId Account.F, ContractId Holding.F, AccountKey) 
     optNftAccount: Optional (ContractId Account.F, ContractId Holding.F, ContractId Instrument.F, AccountKey) 
     rewardPoints : Int
+    tradeAmountRemain : Decimal
     badges : [ContractId Badge.Badge]
   where 
     signatory custodian, owner
@@ -192,6 +193,16 @@ template Account
         let
           mergeholding = coerceContractId mergeFungible
         pure (mergeholding)
+      
+    choice UpdateRewardPoints: ContractId Account
+      with
+        input_rewardPoints : Int
+        input_tradeAmountRemain : Decimal
+      controller owner
+      do
+        create this with
+          rewardPoints = input_rewardPoints
+          tradeAmountRemain = input_tradeAmountRemain
 
 
 -- we use custodian Party as admin for simplicity

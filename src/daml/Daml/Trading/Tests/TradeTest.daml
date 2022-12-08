@@ -86,14 +86,17 @@ setup = do
     cashInstrument = InstrumentKey with issuer = admin, depository = admin, id = cashInstrumentId, version = cashInstrumentVersion
 
   aliceRequestCid <- submit alice do
-    createCmd CreditCashAccount.AdminRequest
+    createCmd CreditCashAccount.UserRequest
       with
         owner = alice
         custodian = admin
         instrument = cashInstrument
         amount = 1000.0
 
-  aliceCashHoldingCid <- submit admin do exerciseCmd aliceRequestCid CreditCashAccount.Accept
+  (aliceCashHoldingCid,_) <- submit admin do
+    exerciseCmd aliceRequestCid CreditCashAccount.Credit
+      with
+        holdingCid = adminHoldingCid
 
   nftIssueRequestCid <- submit bob do 
     createCmd Nft.Request 

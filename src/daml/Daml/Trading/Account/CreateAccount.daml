@@ -36,7 +36,8 @@ template Request
             address 
             optCashAccount = None 
             optNftAccount = None 
-            rewardPoints = 0 
+            rewardPoints = 0
+            tradeAmountRemain = 0.0
             badges = []
         pure (accountCid, serviceCid)
 

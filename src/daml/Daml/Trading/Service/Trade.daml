@@ -13,6 +13,7 @@ import Daml.Finance.Interface.Settlement.Types (Step(..), Allocation(..), Approv
 import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..), InstrumentKey(..))
 import Daml.Trading.Account.Account qualified as Account (Account, Split(..), cashLabel)
 import Daml.Trading.Nft.Nft qualified as Nft (Nft)
+import Daml.Trading.Reward.TradingPoint as TradingPoint
 
 calTransferAmount: Decimal -> Decimal -> Decimal 
 calTransferAmount amount royalty = amount * (1.0 - royalty)
@@ -218,5 +219,19 @@ template TradeSettlement
         
         exercise royaltyTransferableCid Transferable.Transfer with 
           newOwnerAccount = adminCashAccKey 
+
+        -- let 
+        --   tradeIdText = show cashInstrument.id <> " - " <> show nftKey.id <> " - " <> show now
+        let 
+          instrumentData = (Id "USD", "0")
+
+        tradeSuccessSignal <- create TradingPoint.TradeSuccess with
+          admin = custodian
+          seller = seller
+          buyer = buyer
+          tradeAmount = amount
+          asset = show (instrumentData)
+
+        exercise tradeSuccessSignal TradingPoint.IssueRewardPoint
         
         pure (buyerHoldingCid, sellerHoldingCid)
