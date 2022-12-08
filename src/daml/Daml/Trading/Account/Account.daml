@@ -15,7 +15,7 @@ import Daml.Trading.Reward.Badge qualified as Badge
 
 cashLabel = "Cash"
 nftLabel = "Nft"
-config_points_rate : Decimal = 500.0 -- Assum 500USD = 1 point
+configPointsRate : Decimal = 500.0 -- Assum 500USD = 1 point
 
 -- to fetch the account factory for subsequent account creation
 template AccountFactoryReference 
@@ -197,13 +197,13 @@ template Account
       
     choice UpdateRewardPoints: ContractId Account
       with
-        input_rewardPoints : Int
-        input_tradeAmountRemain : Decimal
+        inputRewardPoints : Int
+        inputTradeAmountRemain : Decimal
       controller custodian
       do
         create this with
-          rewardPoints = input_rewardPoints
-          tradeAmountRemain = input_tradeAmountRemain
+          rewardPoints = inputRewardPoints
+          tradeAmountRemain = inputTradeAmountRemain
 
 
 -- we use custodian Party as admin for simplicity

@@ -5,7 +5,7 @@ import Daml.Trading.Account.Account qualified as Account
 calPointAndAmountRemain : Decimal -> (Int, Decimal)
 calPointAndAmountRemain tradeAmount = (point, tradePointRemain)
   where
-    pointRate = Account.config_points_rate
+    pointRate = Account.configPointsRate
     point = truncate (tradeAmount / pointRate) 
     tradePointRemain = tradeAmount - (pointRate * intToDecimal(point))
 
@@ -39,13 +39,13 @@ template TradeSuccess
           finalBuyerPointt = lastBuyerTradingPoint.rewardPoints + currentPoint + buyerPoint
         
         updateSeller <- exercise sellerTradingPointCid Account.UpdateRewardPoints with
-          input_rewardPoints = finalSellerPoint
-          input_tradeAmountRemain = tradeAmountRemainSeller
+          inputRewardPoints = finalSellerPoint
+          inputTradeAmountRemain = tradeAmountRemainSeller
           ..
           
         updateBuyer <- exercise buyerTradingPointCid Account.UpdateRewardPoints with
-          input_rewardPoints = finalBuyerPointt
-          input_tradeAmountRemain = tradeAmountRemainBuyer
+          inputRewardPoints = finalBuyerPointt
+          inputTradeAmountRemain = tradeAmountRemainBuyer
           ..
 
         pure(updateSeller,updateBuyer)
