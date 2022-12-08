@@ -227,6 +227,6 @@ template TradeSettlement
           tradeAmount = amount
           asset = show (batchCid)
 
-        exercise tradeSuccessfullySignal TradingPoint.IssueRewardPoint
+        -- exercise tradeSuccessfullySignal TradingPoint.IssueRewardPoint
         
         pure (buyerHoldingCid, sellerHoldingCid)

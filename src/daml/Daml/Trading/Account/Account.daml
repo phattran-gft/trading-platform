@@ -72,7 +72,7 @@ template Account
         newAccountType: AccountType 
       controller custodian 
       do 
-        assertMsg ("New account type should be different from current one") (accountType /= newAccountType)
+        assertMsg "New account type should be different from current one" (accountType /= newAccountType)
         create this with accountType = newAccountType 
     
     choice Create_Cash_Account: ContractId Account 
@@ -83,7 +83,7 @@ template Account
         observers: [Party] 
       controller custodian 
       do 
-        assertMsg ("User already has a cash account") (isNone optCashAccount) 
+        assertMsg "User already has a cash account" (isNone optCashAccount) 
 
         let
           observersSet = S.fromList $ map S.singleton observers
@@ -106,7 +106,7 @@ template Account
         observers: [Party] 
       controller custodian 
       do 
-        assertMsg ("User already has a nft account") (isNone optNftAccount) 
+        assertMsg "User already has a nft account" (isNone optNftAccount) 
 
         let
           observersSet = S.fromList $ map S.singleton observers

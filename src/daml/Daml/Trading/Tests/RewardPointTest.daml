@@ -3,80 +3,24 @@ module Daml.Trading.Tests.RewardPointTest where
 import DA.Optional (fromSome)
 import DA.Set as Set (fromList, singleton)
 import Daml.Script 
-
+import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Types.Common (InstrumentKey(..), AccountKey(..), Id(..))
 import Daml.Finance.Interface.Settlement.Types (Allocation(..), Approval(..))
 import Daml.Finance.Interface.Settlement.Factory qualified as Factory (I)
-
 import Daml.Finance.Settlement.Factory (Factory(..))
-
-import Daml.Trading.Account.CreateAccount qualified as CreateAccount
 import Daml.Trading.Account.Account qualified as Account
-import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
 import Daml.Trading.Nft.Nft qualified as Nft 
 import Daml.Trading.Service.Service qualified as Service 
 import Daml.Trading.Service.Trade qualified as Trade 
-import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
-import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (initialize, instrumentData)
-  
+import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (instrumentData)
+import Daml.Trading.Tests.CashIssuanceTest qualified as CashInssuanceTest
 
-sucessfullyClaimBadgeAfterTrade : Script ()
-sucessfullyClaimBadgeAfterTrade = do
-  (public, admin, cashInstrument, accountFactoryCid, 
-    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid) <- HoldingSetup.initialize 
-  [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
-
-  aliceRequestCid <- submit alice do
-    createCmd CreateAccount.Request
-      with
-        owner = alice
-        custodian = admin
-        accountType = Account.Retail 
-        username = "alice" 
-        realName = "Alice Ackerson" 
-        passportNumber = "222222" 
-        nationalId = "" 
-        address  = "New York" 
-  (aliceAccountCid, aliceServiceCid) <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
-  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Cash_Account 
-    with 
-      description = "Alice Cash Account"
-      accountFactoryCid = accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid
-      observers = []
-  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Nft_Account 
-    with 
-      description = "Alice Nft Account"
-      accountFactoryCid = accountFactoryCid
-      holdingFactoryCid = nftHoldingFactoryCid
-      instrumentFactoryCid 
-      observers = []
-
-  bobRequestCid <- submit bob do
-    createCmd CreateAccount.Request
-      with
-        owner = bob
-        custodian = admin
-        accountType = Account.Retail 
-        username = "bob" 
-        realName = "Bob Bader" 
-        passportNumber = "" 
-        nationalId = "333333" 
-        address  = "Boston" 
-  (bobAccountCid, bobServiceCid) <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
-  bobAccountCid <- submit admin $ exerciseCmd bobAccountCid Account.Create_Cash_Account 
-    with 
-      description = "Bob Cash Account"
-      accountFactoryCid = accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid 
-      observers = []
-  bobAccountCid <- submit admin $ exerciseCmd bobAccountCid Account.Create_Nft_Account 
-    with 
-      description = "Bob Nft Account"
-      accountFactoryCid = accountFactoryCid
-      holdingFactoryCid = nftHoldingFactoryCid 
-      instrumentFactoryCid = instrumentFactoryCid
-      observers = []
+sucessfullyReceivePoints : Script RewardPointTestState
+sucessfullyReceivePoints = do
+  (public, admin, alice, bob, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid,
+    adminHoldingCid,aliceCashHoldingCid, aliceCashHoldingCid2, adminHoldingCidRemain,
+    aliceAccountCid,bobAccountCid,bobServiceCid) <- CashInssuanceTest.cashIssuance
 
   let 
     (cashInstrumentId, cashInstrumentVersion) = HoldingSetup.instrumentData
@@ -85,19 +29,6 @@ sucessfullyClaimBadgeAfterTrade = do
     bobCashAccKey = AccountKey with custodian = admin, owner = bob, id = Id Account.cashLabel
     bobNftAccKey = AccountKey with custodian = admin, owner = bob, id = Id Account.nftLabel
     cashInstrument = InstrumentKey with issuer = admin, depository = admin, id = cashInstrumentId, version = cashInstrumentVersion
-
-  aliceRequestCid <- submit alice do
-    createCmd CreditCashAccount.UserRequest
-      with
-        owner = alice
-        custodian = admin
-        instrument = cashInstrument
-        amount = 100_000.0
-
-  (aliceCashHoldingCid,_) <- submit admin do
-    exerciseCmd aliceRequestCid CreditCashAccount.Credit
-      with
-        holdingCid = adminHoldingCid
 
   nftIssueRequestCid <- submit bob do 
     createCmd Nft.Request 
@@ -129,9 +60,9 @@ sucessfullyClaimBadgeAfterTrade = do
     nftKey 
     settlementFactoryCid 
 
-  tradeCid <- submit bob $ exerciseCmd tradeCid Trade.Seller_Counter with newAmount = 8_050.0
-  tradeCid <- submit alice $ exerciseCmd tradeCid Trade.Agree with actor = alice, agreedAmount = 8_050.0 
-  tradeCid <- submit bob $ exerciseCmd tradeCid Trade.Agree with actor = bob, agreedAmount = 8_050.0 
+  tradeCid <- submit bob $ exerciseCmd tradeCid Trade.Seller_Counter with newAmount = 988_050.0
+  tradeCid <- submit alice $ exerciseCmd tradeCid Trade.Agree with actor = alice, agreedAmount = 988_050.0 
+  tradeCid <- submit bob $ exerciseCmd tradeCid Trade.Agree with actor = bob, agreedAmount = 988_050.0 
 
   tradeSettlementCid <- submit alice $ exerciseCmd tradeCid Trade.Create_Settlement with actor = alice
 
@@ -144,6 +75,7 @@ sucessfullyClaimBadgeAfterTrade = do
   tradeSettlementCid <- submit alice $ exerciseCmd tradeSettlementCid Trade.Approve_Receive with 
     approval = TakeDelivery aliceNftAccKey
   
-  submitMulti [alice, bob] [public] $ exerciseCmd tradeSettlementCid Trade.Trade_Settle
+  submitMulti [alice] [public] $ exerciseCmd tradeSettlementCid Trade.Trade_Settle
 
-  pure()
+  pure(alice)
+type RewardPointTestState = (Party)

@@ -2,73 +2,18 @@ module Daml.Trading.Tests.CashRedemptionTest where
 
 import Daml.Script
 
-import Daml.Finance.Interface.Types.Common (InstrumentKey(..), AccountKey(..), Id(..))
-import Daml.Trading.Account.CreateAccount qualified as CreateAccount
 import Daml.Trading.Account.Account qualified as Account
-import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
-import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
-import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (initialize, instrumentData) 
 import Daml.Trading.Cash.CashRedemption qualified as CashRedemption
 import DA.Optional (fromSome)
+import Daml.Trading.Tests.CashIssuanceTest qualified as CashInssuanceTest
 
 
 shouldSuccessfullyRedeemCash: Script ()
 shouldSuccessfullyRedeemCash = do
-  (public, admin, cashInstrument, accountFactoryCid, 
-    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid) <- HoldingSetup.initialize 
-  [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
-  
-  aliceRequestCid <- submit alice do
-    createCmd CreateAccount.Request
-      with
-        owner = alice
-        custodian = admin
-        accountType = Account.Retail 
-        username = "alice" 
-        realName = "Alice Ackerson" 
-        passportNumber = "222222" 
-        nationalId = "" 
-        address  = "New York" 
-  (aliceAccountCid, _) <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
-  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Cash_Account 
-    with 
-      description = "Alice Cash Account"
-      accountFactoryCid = accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid
-      observers = []
-  let 
-    (instrumentId, instrumentVersion) = HoldingSetup.instrumentData
-    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id Account.cashLabel
-    adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id Account.cashLabel
-  
-  aliceRequestCid <- submit alice do
-    createCmd CreditCashAccount.UserRequest
-      with
-        owner = alice
-        custodian = admin
-        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
-        amount = 1000.0
-
-  (aliceCashHoldingCid,adminRemainingOpt) <- submit admin do 
-    exerciseCmd aliceRequestCid CreditCashAccount.Credit
-      with
-        holdingCid = adminHoldingCid
-
-  let 
-    adminHoldingCidRemain = fromSome adminRemainingOpt
-  
-  aliceRequestCid2 <- submit alice do
-    createCmd CreditCashAccount.UserRequest
-      with
-        owner = alice
-        custodian = admin
-        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
-        amount = 2000.0
-
-  (aliceCashHoldingCid2,adminRemainingOpt) <- submit admin do 
-    exerciseCmd aliceRequestCid2 CreditCashAccount.Credit
-      with
-        holdingCid = adminHoldingCidRemain
+  (public, admin, alice, bob, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid,
+    adminHoldingCid,aliceCashHoldingCid, aliceCashHoldingCid2, adminHoldingCidRemain,
+    aliceAccountCid,bobAccountCid,bobServiceCid) <- CashInssuanceTest.cashIssuance
   
   aliceMergeCashHoldingCid <- submit alice do exerciseCmd aliceAccountCid Account.Merge with holdingCids = [aliceCashHoldingCid,aliceCashHoldingCid2]
 
@@ -78,7 +23,7 @@ shouldSuccessfullyRedeemCash = do
         custodian = admin
         owner = alice
         holdingCid = aliceMergeCashHoldingCid
-        amount = 600.0
+        amount = 2_000.0
         instrument = cashInstrument
 
   aliceHoldingCidRemainOpt <- submit admin do 
@@ -93,7 +38,7 @@ shouldSuccessfullyRedeemCash = do
         custodian = admin
         owner = alice
         holdingCid = aliceHoldingCidRemain
-        amount = 2400.0
+        amount = 1_000_000.0
         instrument = cashInstrument
 
   aliceCashHoldingCidremainingOpt <- submit admin do 
@@ -104,48 +49,10 @@ shouldSuccessfullyRedeemCash = do
 
 shouldFailOnBalanceCheck: Script ()
 shouldFailOnBalanceCheck = do
-  (public, admin, cashInstrument, accountFactoryCid, 
-    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid) <- HoldingSetup.initialize 
-  [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
-  
-  aliceRequestCid <- submit alice do
-    createCmd CreateAccount.Request
-      with
-        owner = alice
-        custodian = admin
-        accountType = Account.Retail 
-        username = "alice" 
-        realName = "Alice Ackerson" 
-        passportNumber = "222222" 
-        nationalId = "" 
-        address  = "New York" 
-  (aliceAccountCid, _) <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
-  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Cash_Account 
-    with 
-      description = "Alice Cash Account"
-      accountFactoryCid = accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid
-      observers = []
-  let 
-    (instrumentId, instrumentVersion) = HoldingSetup.instrumentData
-    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id Account.cashLabel
-    adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id Account.cashLabel
-  
-  aliceRequestCid <- submit alice do
-    createCmd CreditCashAccount.UserRequest
-      with
-        owner = alice
-        custodian = admin
-        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
-        amount = 1000.0
-
-  (aliceCashHoldingCid,adminRemainingOpt) <- submit admin do 
-    exerciseCmd aliceRequestCid CreditCashAccount.Credit
-      with
-        holdingCid = adminHoldingCid
-
-  let 
-    adminHoldingCidRemain = fromSome adminRemainingOpt
+  (public, admin, alice, bob, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid,
+    adminHoldingCid,aliceCashHoldingCid, aliceCashHoldingCid2, adminHoldingCidRemain,
+    aliceAccountCid,bobAccountCid,bobServiceCid) <- CashInssuanceTest.cashIssuance
 
   aliceRequestWithdrawal <- submit alice do
     createCmd CashRedemption.WithdrawalRequest
@@ -153,7 +60,7 @@ shouldFailOnBalanceCheck = do
         custodian = admin
         owner = alice
         holdingCid = aliceCashHoldingCid
-        amount = 1200.0
+        amount = 1_005_000.0
         instrument = cashInstrument
 
   aliceHoldingCidRemainOpt <- submitMustFail admin do 

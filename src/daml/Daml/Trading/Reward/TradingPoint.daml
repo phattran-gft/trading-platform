@@ -1,6 +1,20 @@
 module Daml.Trading.Reward.TradingPoint where 
 
 import Daml.Trading.Account.Account qualified as Account
+import Daml.Trigger
+import DA.Foldable
+
+
+issueTradingPointTrigger: Trigger ()
+issueTradingPointTrigger = Trigger with
+  initialize = pure ()
+  updateState = \_ -> pure ()
+  rule = \p -> do
+    debug "triggered"
+    [(tradeSuccessCid,_)] <- query @TradeSuccess
+    exercise tradeSuccessCid IssueRewardPoint
+  registeredTemplates = RegisteredTemplates [registeredTemplate @TradeSuccess]
+  heartbeat = None
 
 calPointAndAmountRemain : Decimal -> (Int, Decimal)
 calPointAndAmountRemain tradeAmount = (point, tradePointRemain)
@@ -21,33 +35,35 @@ template TradeSuccess
     signatory admin
     observer seller, buyer
     ensure seller /= buyer
-    choice IssueRewardPoint : (ContractId Account.Account, ContractId Account.Account)
+    -- choice IssueRewardPoint : (ContractId Account.Account, ContractId Account.Account)
+    choice IssueRewardPoint : ()
       controller admin
       do  
-        (sellerTradingPointCid, lastSellerTradingPoint) <- fetchByKey @Account.Account (admin, seller)
-        (buyerTradingPointCid, lastBuyerTradingPoint) <- fetchByKey @Account.Account (admin, buyer)
+        (oldSellerAccountCid, oldSellerAccount) <- fetchByKey @Account.Account (admin, seller)
+        (oldBuyerAccountCid, oldBuyerAccount) <- fetchByKey @Account.Account (admin, buyer)
         let       
           (currentPoint, currentTradeAmountRemain) = calPointAndAmountRemain tradeAmount
           
-          newSellerTradeAmountRemain = currentTradeAmountRemain + lastSellerTradingPoint.tradeAmountRemain
-          newBuyerTradeAmountRemain = currentTradeAmountRemain + lastBuyerTradingPoint.tradeAmountRemain
+          newSellerTradeAmountRemain = currentTradeAmountRemain + oldSellerAccount.tradeAmountRemain
+          newBuyerTradeAmountRemain = currentTradeAmountRemain + oldBuyerAccount.tradeAmountRemain
 
           (sellerPoint, tradeAmountRemainSeller) = calPointAndAmountRemain newSellerTradeAmountRemain
           (buyerPoint, tradeAmountRemainBuyer) = calPointAndAmountRemain newBuyerTradeAmountRemain
           
-          finalSellerPoint = lastSellerTradingPoint.rewardPoints + currentPoint + sellerPoint
-          finalBuyerPointt = lastBuyerTradingPoint.rewardPoints + currentPoint + buyerPoint
+          finalSellerPoint = oldSellerAccount.rewardPoints + currentPoint + sellerPoint
+          finalBuyerPointt = oldBuyerAccount.rewardPoints + currentPoint + buyerPoint
         
-        updateSeller <- exercise sellerTradingPointCid Account.UpdateRewardPoints with
+        updateSeller <- exercise oldSellerAccountCid Account.UpdateRewardPoints with
           inputRewardPoints = finalSellerPoint
           inputTradeAmountRemain = tradeAmountRemainSeller
           ..
           
-        updateBuyer <- exercise buyerTradingPointCid Account.UpdateRewardPoints with
+        updateBuyer <- exercise oldBuyerAccountCid Account.UpdateRewardPoints with
           inputRewardPoints = finalBuyerPointt
           inputTradeAmountRemain = tradeAmountRemainBuyer
           ..
 
-        pure(updateSeller,updateBuyer)
+        pure()
+        -- pure(updateSeller,updateBuyer)
 
 
