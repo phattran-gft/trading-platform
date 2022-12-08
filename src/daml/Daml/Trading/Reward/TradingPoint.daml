@@ -24,36 +24,28 @@ template TradeSuccess
     choice IssueRewardPoint : (ContractId Account.Account, ContractId Account.Account)
       controller admin
       do  
-        (sellerTradingPointCid, sellerTradingPoint) <- fetchByKey @Account.Account (admin, seller)
-        (buyerTradingPointCid, buyerTradingPoint) <- fetchByKey @Account.Account (admin, buyer)
+        (sellerTradingPointCid, lastSellerTradingPoint) <- fetchByKey @Account.Account (admin, seller)
+        (buyerTradingPointCid, lastBuyerTradingPoint) <- fetchByKey @Account.Account (admin, buyer)
         let       
-          oldSellerTradingPoint = sellerTradingPoint.rewardPoints
-          oldBuyerTradingPoint = buyerTradingPoint.rewardPoints
-          oldSellerTradeAmountRemain = sellerTradingPoint.tradeAmountRemain
-          oldBuyerTradeAmountRemain = buyerTradingPoint.tradeAmountRemain
-          (quantityPointBaseTradeAmount, tradeAmountRemainBaseTradeAmount) = calPointAndAmountRemain tradeAmount
+          (currentPoint, currentTradeAmountRemain) = calPointAndAmountRemain tradeAmount
           
-          newSellerTradeAmountRemain = tradeAmountRemainBaseTradeAmount + oldSellerTradeAmountRemain
-          newBuyerTradeAmountRemain = tradeAmountRemainBaseTradeAmount + oldBuyerTradeAmountRemain
+          newSellerTradeAmountRemain = currentTradeAmountRemain + lastSellerTradingPoint.tradeAmountRemain
+          newBuyerTradeAmountRemain = currentTradeAmountRemain + lastBuyerTradingPoint.tradeAmountRemain
 
           (sellerPoint, tradeAmountRemainSeller) = calPointAndAmountRemain newSellerTradeAmountRemain
           (buyerPoint, tradeAmountRemainBuyer) = calPointAndAmountRemain newBuyerTradeAmountRemain
-          sellerQuantityPointAfterCalAmountRemain = oldSellerTradingPoint + quantityPointBaseTradeAmount + sellerPoint
-          buyerQuantityPointAfterCalAmountRemain = oldBuyerTradingPoint + quantityPointBaseTradeAmount + buyerPoint
-
-          sellerRewardPoint = sellerQuantityPointAfterCalAmountRemain
-          buyerRewardPoint = buyerQuantityPointAfterCalAmountRemain
-          sellerAmountRemain = tradeAmountRemainSeller
-          buyerAmountRemain = tradeAmountRemainBuyer
+          
+          finalSellerPoint = lastSellerTradingPoint.rewardPoints + currentPoint + sellerPoint
+          finalBuyerPointt = lastBuyerTradingPoint.rewardPoints + currentPoint + buyerPoint
         
         updateSeller <- exercise sellerTradingPointCid Account.UpdateRewardPoints with
-          input_rewardPoints = sellerRewardPoint
-          input_tradeAmountRemain = sellerAmountRemain
+          input_rewardPoints = finalSellerPoint
+          input_tradeAmountRemain = tradeAmountRemainSeller
           ..
           
         updateBuyer <- exercise buyerTradingPointCid Account.UpdateRewardPoints with
-          input_rewardPoints = buyerRewardPoint
-          input_tradeAmountRemain = buyerAmountRemain
+          input_rewardPoints = finalBuyerPointt
+          input_tradeAmountRemain = tradeAmountRemainBuyer
           ..
 
         pure(updateSeller,updateBuyer)

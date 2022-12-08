@@ -1,4 +1,4 @@
-module Daml.Trading.Tests.BadgeTest where 
+module Daml.Trading.Tests.BadgeTest where
 
 import DA.Optional (fromSome)
 import DA.Set as Set (fromList, singleton)
