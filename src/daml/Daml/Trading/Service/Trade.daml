@@ -197,7 +197,7 @@ template TradeSettlement
         create this with recInstructionCid = approvedRecInstructionCid
     
     choice Trade_Settle: (ContractId Holding.I, ContractId Holding.I) 
-      controller buyer 
+      controller buyer
       do 
         -- daml-finance batch settlement
         [buyerHoldingCid, sellerHoldingCid] <- map toInterfaceContractId <$> exercise batchCid Batch.Settle 
@@ -220,18 +220,13 @@ template TradeSettlement
         exercise royaltyTransferableCid Transferable.Transfer with 
           newOwnerAccount = adminCashAccKey 
 
-        -- let 
-        --   tradeIdText = show cashInstrument.id <> " - " <> show nftKey.id <> " - " <> show now
-        let 
-          instrumentData = (Id "USD", "0")
-
-        tradeSuccessSignal <- create TradingPoint.TradeSuccess with
+        tradeSuccessfullySignal <- create TradingPoint.TradeSuccess with
           admin = custodian
           seller = seller
           buyer = buyer
           tradeAmount = amount
-          asset = show (instrumentData)
+          asset = show (batchCid)
 
-        exercise tradeSuccessSignal TradingPoint.IssueRewardPoint
+        exercise tradeSuccessfullySignal TradingPoint.IssueRewardPoint
         
         pure (buyerHoldingCid, sellerHoldingCid)

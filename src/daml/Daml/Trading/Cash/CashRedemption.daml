@@ -4,7 +4,7 @@ import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 import Daml.Finance.Interface.Types.Common (AccountKey(..),Id(..), InstrumentKey(..))
 import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, ArchiveFungible(..))
-import Daml.Trading.Account.Account qualified as CreateAccount
+import Daml.Trading.Account.Account qualified as Account
 
 template WithdrawalRequest
   with
@@ -22,7 +22,7 @@ template WithdrawalRequest
       controller custodian
       do
         let
-          adminBurnAccount = AccountKey with custodian = custodian, owner = custodian, id = Id CreateAccount.cashLabel
+          adminBurnAccount = AccountKey with custodian = custodian, owner = custodian, id = Id Account.cashLabel
           burnCid : ContractId Fungible.I = coerceContractId holdingCid
 
         transferRequest <- create CashTransfer.Request

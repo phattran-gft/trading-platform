@@ -154,6 +154,6 @@ setup = do
   tradeSettlementCid <- submit alice $ exerciseCmd tradeSettlementCid Trade.Approve_Receive with 
     approval = TakeDelivery aliceNftAccKey
   
-  (aliceNftHolding, bobCashHolding) <- submitMulti [alice] [public] $ exerciseCmd tradeSettlementCid Trade.Trade_Settle
+  (aliceNftHolding, bobCashHolding) <- submitMulti [alice,bob] [public] $ exerciseCmd tradeSettlementCid Trade.Trade_Settle
 
   pure ()

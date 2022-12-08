@@ -4,9 +4,11 @@ import Daml.Trading.Account.Account qualified as Account
 
 calPointAndAmountRemain : Decimal -> (Int, Decimal)
 calPointAndAmountRemain tradeAmount = (point, tradePointRemain)
-  where 
-    point = truncate (tradeAmount / 500.0) 
-    tradePointRemain = tradeAmount - intToDecimal(500 * point)
+  where
+    pointRate = Account.config_points_rate
+    point = truncate (tradeAmount / pointRate) 
+    tradePointRemain = tradeAmount - (pointRate * intToDecimal(point))
+
 
 template TradeSuccess
   with
@@ -43,40 +45,17 @@ template TradeSuccess
           buyerRewardPoint = buyerQuantityPointAfterCalAmountRemain
           sellerAmountRemain = tradeAmountRemainSeller
           buyerAmountRemain = tradeAmountRemainBuyer
-              
         
-        seller <- exercise sellerTradingPointCid Account.UpdateRewardPoints with
+        updateSeller <- exercise sellerTradingPointCid Account.UpdateRewardPoints with
           input_rewardPoints = sellerRewardPoint
           input_tradeAmountRemain = sellerAmountRemain
           ..
           
-        buyer <- exercise buyerTradingPointCid Account.UpdateRewardPoints with
+        updateBuyer <- exercise buyerTradingPointCid Account.UpdateRewardPoints with
           input_rewardPoints = buyerRewardPoint
           input_tradeAmountRemain = buyerAmountRemain
           ..
-        -- seller <- create TradingPoint with 
-        --     admin = admin
-        --     holderRewardPoint = seller
-        --     quantity = sellerRewardPoint
-        --     tradeAmountRemain = sellerAmountRemain
-        -- buyer <- create TradingPoint with 
-        --     admin = admin
-        --     holderRewardPoint = buyer
-        --     quantity = buyerRewardPoint
-        --     tradeAmountRemain = buyerAmountRemain 
-        pure (seller, buyer)
 
--- template TradingPoint
---   with
---     admin : Party
---     holderRewardPoint : Party
---     quantity : Int
---     tradeAmountRemain : Decimal
---   where
---     signatory admin
---     observer holderRewardPoint
---     key (admin, holderRewardPoint) : (Party, Party)
---     maintainer key._1
-
+        pure(updateSeller,updateBuyer)
 
 

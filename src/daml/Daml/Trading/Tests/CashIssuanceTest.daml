@@ -1,8 +1,6 @@
-module Daml.Trading.Tests.CashTest where 
+module Daml.Trading.Tests.CashIssuanceTest where 
 
 import Daml.Script 
-
-import Daml.Finance.Interface.Types.Common (InstrumentKey(..), AccountKey(..), Id(..))
 
 import Daml.Trading.Account.CreateAccount qualified as CreateAccount
 import Daml.Trading.Account.Account qualified as Account
