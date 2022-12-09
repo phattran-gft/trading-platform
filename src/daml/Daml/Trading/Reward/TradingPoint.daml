@@ -2,17 +2,22 @@ module Daml.Trading.Reward.TradingPoint where
 
 import Daml.Trading.Account.Account qualified as Account
 import Daml.Trigger
-import DA.Foldable
+import DA.List (head)
 
 
 issueTradingPointTrigger: Trigger ()
 issueTradingPointTrigger = Trigger with
   initialize = pure ()
   updateState = \_ -> pure ()
-  rule = \p -> do
-    debug "triggered"
-    [(tradeSuccessCid,_)] <- query @TradeSuccess
-    exercise tradeSuccessCid IssueRewardPoint
+  rule = \_ -> do
+    -- [(tradeSuccessCid, tradedata)] <- query @TradeSuccess
+    tradedata <- query @TradeSuccess
+    let
+      tradeSuccessdata = head(tradedata)
+      tradeSuccessCid = tradeSuccessdata._1
+    pointissue <- dedupExercise tradeSuccessCid IssueRewardPoint
+    pure()
+    
   registeredTemplates = RegisteredTemplates [registeredTemplate @TradeSuccess]
   heartbeat = None
 
@@ -35,8 +40,8 @@ template TradeSuccess
     signatory admin
     observer seller, buyer
     ensure seller /= buyer
-    -- choice IssueRewardPoint : (ContractId Account.Account, ContractId Account.Account)
-    choice IssueRewardPoint : ()
+    choice IssueRewardPoint : (ContractId Account.Account, ContractId Account.Account)
+    -- choice IssueRewardPoint : ()
       controller admin
       do  
         (oldSellerAccountCid, oldSellerAccount) <- fetchByKey @Account.Account (admin, seller)
@@ -63,7 +68,7 @@ template TradeSuccess
           inputTradeAmountRemain = tradeAmountRemainBuyer
           ..
 
-        pure()
-        -- pure(updateSeller,updateBuyer)
+        -- pure()
+        pure(updateSeller,updateBuyer)
 
 

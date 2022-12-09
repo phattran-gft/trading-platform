@@ -3,7 +3,6 @@ module Daml.Trading.Tests.RewardPointTest where
 import DA.Optional (fromSome)
 import DA.Set as Set (fromList, singleton)
 import Daml.Script 
-import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Types.Common (InstrumentKey(..), AccountKey(..), Id(..))
 import Daml.Finance.Interface.Settlement.Types (Allocation(..), Approval(..))
 import Daml.Finance.Interface.Settlement.Factory qualified as Factory (I)
@@ -15,8 +14,8 @@ import Daml.Trading.Service.Trade qualified as Trade
 import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (instrumentData)
 import Daml.Trading.Tests.CashIssuanceTest qualified as CashInssuanceTest
 
-sucessfullyReceivePoints : Script RewardPointTestState
-sucessfullyReceivePoints = do
+successfullyReceivePoints : Script RewardPointTestState
+successfullyReceivePoints = do
   (public, admin, alice, bob, cashInstrument, accountFactoryCid, 
     cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid,
     adminHoldingCid,aliceCashHoldingCid, aliceCashHoldingCid2, adminHoldingCidRemain,
