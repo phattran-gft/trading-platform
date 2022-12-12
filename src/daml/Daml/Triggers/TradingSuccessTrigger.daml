@@ -10,9 +10,9 @@ issueTradingPointTrigger = Trigger with
   initialize = pure ()
   updateState = \_ -> pure ()
   rule = \p -> do
-    debug ("triggered")
-    tradeData <- query @TradeSuccess
-    forA_ tradeData (\tradeSuccessdata -> do
+    debug ("Issue trading point")
+    adminTradeData <- queryFilter @TradeSuccess (\tx -> tx.admin==p)
+    forA_ adminTradeData (\tradeSuccessdata -> do
       let
         tradeSuccessCid = tradeSuccessdata._1
       dedupExercise tradeSuccessCid IssueRewardPoint

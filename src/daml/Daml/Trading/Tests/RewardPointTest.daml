@@ -77,7 +77,13 @@ successfullyReceivePoints = do
   
   (aliceNftHolding, bobCashHolding, tradeSuccessfullySignal) <- submitMulti [alice] [public] $ exerciseCmd tradeSettlementCid Trade.Trade_Settle
 
-  submit admin $ exerciseCmd tradeSuccessfullySignal TradingPoint.IssueRewardPoint
+  (newPointSellerCid, newPointBuyerCid) <- submit admin $ exerciseCmd tradeSuccessfullySignal TradingPoint.IssueRewardPoint
+  
+  Some sellerTradingPoint <- queryContractId bob newPointSellerCid
+  Some buyerTradingPoint <- queryContractId alice newPointBuyerCid
+
+  assert (sellerTradingPoint.rewardPoints == 1976)
+  assert (buyerTradingPoint.tradeAmountRemain == 50.0)
 
   pure(alice)
 type RewardPointTestState = (Party)
