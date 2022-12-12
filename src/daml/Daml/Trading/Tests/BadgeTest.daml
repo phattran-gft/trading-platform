@@ -9,7 +9,7 @@ import Daml.Trading.Tests.RewardPointTest qualified as RewardPointTest
 sucessfullyClaimBadgeAfterTrade : Script ()
 sucessfullyClaimBadgeAfterTrade = do
   
-  (alice) <- RewardPointTest.sucessfullyReceivePoints
+  (alice) <- RewardPointTest.successfullyReceivePoints
 
   [(aliceAccountCid,_)] <- query @Account.Account alice
 
