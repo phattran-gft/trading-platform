@@ -11,9 +11,9 @@ import Daml.Finance.Interface.Settlement.Batch qualified as Batch (Settle(..), I
 import Daml.Finance.Interface.Settlement.Instruction qualified as Instruction (Allocate(..), Approve(..), I)
 import Daml.Finance.Interface.Settlement.Types (Step(..), Allocation(..), Approval(..))
 import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..), InstrumentKey(..))
-import Daml.Trading.Account.Account qualified as Account (Account, Split(..), cashLabel)
+import Daml.Trading.Account.Account qualified as Account
 import Daml.Trading.Nft.Nft qualified as Nft (Nft)
-import Daml.Trading.Reward.TradingPoint as TradingPoint
+import Daml.Trading.Reward.TradingPoint qualified as TradingPoint
 
 calTransferAmount: Decimal -> Decimal -> Decimal 
 calTransferAmount amount royalty = amount * (1.0 - royalty)
@@ -196,7 +196,7 @@ template TradeSettlement
           approval 
         create this with recInstructionCid = approvedRecInstructionCid
     
-    choice Trade_Settle: (ContractId Holding.I, ContractId Holding.I) 
+    choice Trade_Settle: (ContractId Holding.I, ContractId Holding.I, ContractId TradingPoint.TradeSuccess) 
       controller buyer
       do 
         -- daml-finance batch settlement
@@ -226,7 +226,7 @@ template TradeSettlement
           buyer = buyer
           tradeAmount = amount
           asset = show (batchCid)
-
+          
         -- exercise tradeSuccessfullySignal TradingPoint.IssueRewardPoint
         
-        pure (buyerHoldingCid, sellerHoldingCid)
+        pure (buyerHoldingCid, sellerHoldingCid, tradeSuccessfullySignal)

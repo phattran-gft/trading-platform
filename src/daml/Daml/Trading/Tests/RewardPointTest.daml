@@ -13,6 +13,7 @@ import Daml.Trading.Service.Service qualified as Service
 import Daml.Trading.Service.Trade qualified as Trade 
 import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (instrumentData)
 import Daml.Trading.Tests.CashIssuanceTest qualified as CashInssuanceTest
+import Daml.Trading.Reward.TradingPoint qualified as TradingPoint
 
 successfullyReceivePoints : Script RewardPointTestState
 successfullyReceivePoints = do
@@ -74,7 +75,9 @@ successfullyReceivePoints = do
   tradeSettlementCid <- submit alice $ exerciseCmd tradeSettlementCid Trade.Approve_Receive with 
     approval = TakeDelivery aliceNftAccKey
   
-  submitMulti [alice] [public] $ exerciseCmd tradeSettlementCid Trade.Trade_Settle
+  (aliceNftHolding, bobCashHolding, tradeSuccessfullySignal) <- submitMulti [alice] [public] $ exerciseCmd tradeSettlementCid Trade.Trade_Settle
+
+  submit admin $ exerciseCmd tradeSuccessfullySignal TradingPoint.IssueRewardPoint
 
   pure(alice)
 type RewardPointTestState = (Party)

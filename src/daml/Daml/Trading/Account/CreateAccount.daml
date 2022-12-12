@@ -2,6 +2,7 @@ module Daml.Trading.Account.CreateAccount where
 
 import Daml.Trading.Account.Account 
 import Daml.Trading.Service.Service 
+import Daml.Trading.Reward.TradingPoint qualified as TradingPoint 
 
 template Request 
   with 
@@ -36,9 +37,14 @@ template Request
             address 
             optCashAccount = None 
             optNftAccount = None 
-            rewardPoints = 0
-            tradeAmountRemain = 0.0
             badges = []
+
+        create TradingPoint.TradingPoint with
+          custodian = custodian
+          owner = owner
+          rewardPoints = 0
+          tradeAmountRemain =0.0
+
         pure (accountCid, serviceCid)
 
     choice Request_Decline : ()
