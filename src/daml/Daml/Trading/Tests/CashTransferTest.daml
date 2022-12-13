@@ -2,90 +2,19 @@ module Daml.Trading.Tests.CashTransferTest where
 
 import Daml.Script
 
-import Daml.Finance.Interface.Types.Common (InstrumentKey(..), AccountKey(..), Id(..))
-import Daml.Trading.Account.CreateAccount qualified as CreateAccount
+import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
 import Daml.Trading.Account.Account qualified as Account
 import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
-import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
-import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
-import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (initialize, instrumentData) 
-import DA.Optional (fromSome)
+import Daml.Trading.Tests.CashIssuanceTest qualified as CashInssuanceTest
 
 shouldSuccessfullyTransferCash: Script ()
 shouldSuccessfullyTransferCash = do
-  (public, admin, cashInstrument, accountFactoryCid, 
-    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid) <- HoldingSetup.initialize 
-  [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
   
-  aliceRequestCid <- submit alice do
-    createCmd CreateAccount.Request
-      with
-        owner = alice
-        custodian = admin
-        accountType = Account.Retail 
-        username = "alice" 
-        realName = "Alice Ackerson" 
-        passportNumber = "222222" 
-        nationalId = "" 
-        address  = "New York" 
-  (aliceAccountCid, _) <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
+  (public, admin, alice, bob, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid,
+    adminHoldingCid,aliceCashHoldingCid, aliceCashHoldingCid2, adminHoldingCidRemain,
+    aliceAccountCid,bobAccountCid,bobServiceCid) <- CashInssuanceTest.cashIssuance
 
-  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Cash_Account 
-    with 
-      description = "Alice Cash Account"
-      accountFactoryCid = accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid
-      observers = []
-  let 
-    (instrumentId, instrumentVersion) = HoldingSetup.instrumentData
-    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id Account.cashLabel
-    adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id Account.cashLabel
-  
-  aliceRequestCid <- submit alice do
-    createCmd CreditCashAccount.UserRequest
-      with
-        owner = alice
-        custodian = admin
-        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
-        amount = 1000.0
-
-  (aliceCashHoldingCid,adminRemainingOpt) <- submit admin do 
-    exerciseCmd aliceRequestCid CreditCashAccount.Credit
-      with
-        holdingCid = adminHoldingCid
-
-  aliceRequestCid2 <- submit alice do
-    createCmd CreditCashAccount.UserRequest
-      with
-        owner = alice
-        custodian = admin
-        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
-        amount = 3000.0
-
-  (aliceCashHoldingCid2,adminRemainingOpt) <- submit admin do 
-    exerciseCmd aliceRequestCid2 CreditCashAccount.Credit
-      with
-        holdingCid = fromSome (adminRemainingOpt)
-
-  bobRequestCid <- submit bob do
-    createCmd CreateAccount.Request
-      with
-        owner = bob
-        custodian = admin
-        accountType = Account.Retail 
-        username = "bob" 
-        realName = "Bob Bader" 
-        passportNumber = "" 
-        nationalId = "333333" 
-        address  = "Boston" 
-  (bobAccountCid,_) <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept
-    
-  bobAccountCid <- submit admin $ exerciseCmd bobAccountCid Account.Create_Cash_Account 
-    with 
-      description = "Bob Cash Account"
-      accountFactoryCid = accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid
-      observers = [alice]
   let
     bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id Account.cashLabel
   
@@ -94,78 +23,24 @@ shouldSuccessfullyTransferCash = do
       with
         receiverAccount = bobAccountKey
         instrument = cashInstrument
-        amount = 3500.0
+        amount = 350_000.0
         owner = alice
         custodian = admin
 
-  (newbobHoldingCid,newaliceRemainingCid) <- submitMulti [alice] [public] do
+  (newbobHoldingCid, newaliceRemainingCid) <- submitMulti [alice] [public] do
     exerciseCmd transferRequestCid CashTransfer.Accept
       with
         holdingCids = [aliceCashHoldingCid,aliceCashHoldingCid2]
-
   pure()
 
 
 shouldFailTransferCashOnBalanceCheck: Script ()
 shouldFailTransferCashOnBalanceCheck = do
-  (public, admin, cashInstrument, accountFactoryCid, 
-    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid) <- HoldingSetup.initialize 
-  [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
-  
-  aliceRequestCid <- submit alice do
-    createCmd CreateAccount.Request
-      with
-        owner = alice
-        custodian = admin
-        accountType = Account.Retail 
-        username = "alice" 
-        realName = "Alice Ackerson" 
-        passportNumber = "222222" 
-        nationalId = "" 
-        address  = "New York" 
-  (aliceAccountCid, _) <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
-  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Cash_Account 
-    with 
-      description = "Alice Cash Account"
-      accountFactoryCid = accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid
-      observers = []
-  let 
-    (instrumentId, instrumentVersion) = HoldingSetup.instrumentData
-    aliceAccountKey = AccountKey with custodian = admin, owner = alice, id = Id Account.cashLabel
-    adminAccountKey = AccountKey with custodian = admin, owner = admin, id = Id Account.cashLabel
-  
-  aliceRequestCid <- submit alice do
-    createCmd CreditCashAccount.UserRequest
-      with
-        owner = alice
-        custodian = admin
-        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
-        amount = 10000.0
+  (public, admin, alice, bob, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid,
+    adminHoldingCid,aliceCashHoldingCid, aliceCashHoldingCid2, adminHoldingCidRemain,
+    aliceAccountCid,bobAccountCid,bobServiceCid) <- CashInssuanceTest.cashIssuance
 
-  (aliceCashHoldingCid,adminRemainingOpt) <- submit admin do 
-    exerciseCmd aliceRequestCid CreditCashAccount.Credit
-      with
-        holdingCid = adminHoldingCid
-
-  bobRequestCid <- submit bob do
-    createCmd CreateAccount.Request
-      with
-        owner = bob
-        custodian = admin
-        accountType = Account.Retail 
-        username = "bob" 
-        realName = "Bob Bader" 
-        passportNumber = "" 
-        nationalId = "333333" 
-        address  = "Boston" 
-  (bobAccountCid,_) <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
-  bobAccountCid <- submit admin $ exerciseCmd bobAccountCid Account.Create_Cash_Account 
-    with 
-      description = "Bob Cash Account"
-      accountFactoryCid = accountFactoryCid
-      holdingFactoryCid = cashHoldingFactoryCid
-      observers = [alice]
   let
     bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id Account.cashLabel
   
@@ -174,7 +49,7 @@ shouldFailTransferCashOnBalanceCheck = do
       with
         receiverAccount = bobAccountKey
         instrument = cashInstrument
-        amount = 20000.0
+        amount = 2_000_000.0
         owner = alice
         custodian = admin
 

@@ -12,6 +12,7 @@ import Daml.Finance.Interface.Holding.Util (getAmount)
 import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
 import Daml.Finance.Interface.Holding.Fungible qualified as Fungible (I, Split(..), SplitResult(..),Merge(..))
 import Daml.Trading.Reward.Badge qualified as Badge
+import Daml.Trading.Reward.TradingPoint qualified as TradingPoint
 
 cashLabel = "Cash"
 nftLabel = "Nft"
@@ -58,7 +59,6 @@ template Account
     address: Text 
     optCashAccount: Optional (ContractId Account.F, ContractId Holding.F, AccountKey) 
     optNftAccount: Optional (ContractId Account.F, ContractId Holding.F, ContractId Instrument.F, AccountKey) 
-    rewardPoints : Int
     badges : [ContractId Badge.Badge]
   where 
     signatory custodian, owner
@@ -70,7 +70,7 @@ template Account
         newAccountType: AccountType 
       controller custodian 
       do 
-        assertMsg ("New account type should be different from current one") (accountType /= newAccountType)
+        assertMsg "New account type should be different from current one" (accountType /= newAccountType)
         create this with accountType = newAccountType 
     
     choice Create_Cash_Account: ContractId Account 
@@ -81,7 +81,7 @@ template Account
         observers: [Party] 
       controller custodian 
       do 
-        assertMsg ("User already has a cash account") (isNone optCashAccount) 
+        assertMsg "User already has a cash account" (isNone optCashAccount) 
 
         let
           observersSet = S.fromList $ map S.singleton observers
@@ -104,7 +104,7 @@ template Account
         observers: [Party] 
       controller custodian 
       do 
-        assertMsg ("User already has a nft account") (isNone optNftAccount) 
+        assertMsg "User already has a nft account" (isNone optNftAccount) 
 
         let
           observersSet = S.fromList $ map S.singleton observers
@@ -124,8 +124,10 @@ template Account
       controller owner
       do
         contractBadgeList <- forA badges \badge -> fetch badge
+        (tradingPointCid,tradingPointData) <- fetchByKey @TradingPoint.TradingPoint (custodian,owner)
         let
-          currentRewardPoints = rewardPoints
+          currentRewardPoints = tradingPointData.rewardPoints
+          currentTradeAmountRemain = tradingPointData.tradeAmountRemain
           badgeTypeListUser = map (\contractBadge -> contractBadge.badge) contractBadgeList
         assertMsg "Trader already owns this badge!" (redeem_badge `notElem` badgeTypeListUser)
         case (redeem_badge) of
@@ -136,9 +138,11 @@ template Account
               owner = owner
               badge = redeem_badge
             accountWithBadgeCid <- create Account with 
-              rewardPoints = currentRewardPoints - 20
               badges = newBadge :: badges
               ..
+            exercise tradingPointCid TradingPoint.UpdateRewardPoints with
+              inputRewardPoints = currentRewardPoints - 20
+              inputTradeAmountRemain = currentTradeAmountRemain
             pure(accountWithBadgeCid)
           Badge.Pro_Trader -> do
             assertMsg "Not enough points" (currentRewardPoints >= 100)
@@ -148,9 +152,11 @@ template Account
               owner = owner
               badge = redeem_badge
             accountWithBadgeCid <- create Account with 
-              rewardPoints = currentRewardPoints - 100
               badges = newBadge :: badges
               ..
+            exercise tradingPointCid TradingPoint.UpdateRewardPoints with
+              inputRewardPoints = currentRewardPoints - 100
+              inputTradeAmountRemain = currentTradeAmountRemain
             pure(accountWithBadgeCid)
           Badge.Hall_of_Fame_Trader -> do
             assertMsg "Not enough points" (currentRewardPoints >= 1000)
@@ -160,9 +166,11 @@ template Account
               owner = owner
               badge = redeem_badge
             accountWithBadgeCid <- create Account with 
-              rewardPoints = currentRewardPoints - 1000
               badges = newBadge :: badges
               ..
+            exercise tradingPointCid TradingPoint.UpdateRewardPoints with
+              inputRewardPoints = currentRewardPoints - 1000
+              inputTradeAmountRemain = currentTradeAmountRemain
             pure(accountWithBadgeCid)
 
     nonconsuming choice Split : (ContractId Holding.I, Optional (ContractId Holding.I))
