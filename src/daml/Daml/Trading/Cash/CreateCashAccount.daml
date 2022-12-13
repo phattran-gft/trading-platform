@@ -5,7 +5,7 @@ import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
 
 import Daml.Trading.Account.Account (Create_Cash_Account(..), Account)
 
-template Request 
+template CashAccountRequest 
   with 
     custodian: Party 
     owner: Party 

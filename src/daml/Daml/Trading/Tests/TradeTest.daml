@@ -26,7 +26,7 @@ setup = do
   [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
 
   aliceRequestCid <- submit alice do
-    createCmd CreateAccount.Request
+    createCmd CreateAccount.AccountRequest
       with
         owner = alice
         custodian = admin
@@ -52,7 +52,7 @@ setup = do
       observers = []
 
   bobRequestCid <- submit bob do
-    createCmd CreateAccount.Request
+    createCmd CreateAccount.AccountRequest
       with
         owner = bob
         custodian = admin
@@ -86,7 +86,7 @@ setup = do
     cashInstrument = InstrumentKey with issuer = admin, depository = admin, id = cashInstrumentId, version = cashInstrumentVersion
 
   aliceRequestCid <- submit alice do
-    createCmd CreditCashAccount.UserRequest
+    createCmd CreditCashAccount.UserCreditRequest
       with
         owner = alice
         custodian = admin

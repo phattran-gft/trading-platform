@@ -19,7 +19,7 @@ shouldSuccessfullyTransferCash = do
     bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id Account.cashLabel
   
   transferRequestCid <- submit bob do
-    createCmd CashTransfer.Request
+    createCmd CashTransfer.TransferRequest
       with
         receiverAccount = bobAccountKey
         instrument = cashInstrument
@@ -45,7 +45,7 @@ shouldFailTransferCashOnBalanceCheck = do
     bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id Account.cashLabel
   
   transferRequestCid <- submit bob do
-    createCmd CashTransfer.Request
+    createCmd CashTransfer.TransferRequest
       with
         receiverAccount = bobAccountKey
         instrument = cashInstrument

@@ -6,7 +6,7 @@ import Daml.Finance.Interface.Instrument.Base.Factory qualified as Instrument (F
 
 import Daml.Trading.Account.Account (Create_Nft_Account(..), Account)
 
-template Request 
+template NftAccountRequest 
   with 
     custodian: Party 
     owner: Party 

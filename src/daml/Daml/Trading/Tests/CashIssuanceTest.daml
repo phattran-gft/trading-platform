@@ -22,7 +22,7 @@ cashIssuance = do
   [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
 
   aliceRequestCid <- submit alice do
-    createCmd CreateAccount.Request
+    createCmd CreateAccount.AccountRequest
       with
         owner = alice
         custodian = admin
@@ -49,7 +49,7 @@ cashIssuance = do
       observers = []
 
   bobRequestCid <- submit bob do
-    createCmd CreateAccount.Request
+    createCmd CreateAccount.AccountRequest
       with
         owner = bob
         custodian = admin
@@ -78,7 +78,7 @@ cashIssuance = do
     (instrumentId, instrumentVersion) = HoldingSetup.instrumentData
 
   aliceRequestCid <- submit alice do
-    createCmd CreditCashAccount.UserRequest
+    createCmd CreditCashAccount.UserCreditRequest
       with
         owner = alice
         custodian = admin
@@ -94,7 +94,7 @@ cashIssuance = do
     adminHoldingCidRemain = fromSome adminRemainingOpt
 
   aliceRequestCid2 <- submit alice do
-    createCmd CreditCashAccount.UserRequest
+    createCmd CreditCashAccount.UserCreditRequest
       with
         owner = alice
         custodian = admin
