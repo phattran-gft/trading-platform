@@ -7,7 +7,7 @@ import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
 import Daml.Trading.Account.Account qualified as CreateAccount
 import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
 
-template AdminRequest
+template AdminCreditRequest
   with
     owner: Party 
     custodian: Party 
@@ -37,7 +37,7 @@ template AdminRequest
       do pure ()
 
 
-template UserRequest
+template UserCreditRequest
   with
     owner: Party 
     custodian: Party 
@@ -57,7 +57,7 @@ template UserRequest
         let
           userAccount = AccountKey with custodian = custodian, owner = owner, id = Id CreateAccount.cashLabel
 
-        transferRequest <- create CashTransfer.Request
+        transferRequest <- create CashTransfer.TransferRequest
           with
             receiverAccount = userAccount
             instrument = instrument

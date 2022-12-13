@@ -4,7 +4,7 @@ import Daml.Trading.Account.Account
 import Daml.Trading.Service.Service 
 import Daml.Trading.Reward.TradingPoint qualified as TradingPoint 
 
-template Request 
+template AccountRequest 
   with 
     custodian: Party 
     owner: Party 

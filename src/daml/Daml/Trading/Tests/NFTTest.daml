@@ -18,7 +18,7 @@ setup = do
   [alice] <- UserSetup.createUsers public ["Alice"]
   
   aliceRequestCid <- submit alice do
-    createCmd CreateAccount.Request
+    createCmd CreateAccount.AccountRequest
       with
         owner = alice
         custodian = admin

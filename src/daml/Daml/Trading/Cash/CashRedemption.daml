@@ -25,7 +25,7 @@ template WithdrawalRequest
           adminBurnAccount = AccountKey with custodian = custodian, owner = custodian, id = Id Account.cashLabel
           burnCid : ContractId Fungible.I = coerceContractId holdingCid
 
-        transferRequest <- create CashTransfer.Request
+        transferRequest <- create CashTransfer.TransferRequest
           with
             receiverAccount = adminBurnAccount
             instrument = instrument
