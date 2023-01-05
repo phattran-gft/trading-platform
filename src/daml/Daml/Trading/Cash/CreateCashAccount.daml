@@ -1,0 +1,25 @@
+module Daml.Trading.Cash.CreateCashAccount where 
+
+import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (F)
+import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
+
+import Daml.Trading.Account.Account (Create_Cash_Account(..), Account)
+
+template CashAccountRequest 
+  with 
+    custodian: Party 
+    owner: Party 
+  where 
+    signatory owner 
+    observer custodian 
+
+    choice Accept: ContractId Account 
+      with 
+        description: Text 
+        accountFactoryCid: ContractId Account.F 
+        holdingFactoryCid: ContractId Holding.F 
+        observers: [Party] 
+      controller custodian 
+      do 
+        (accountCid, account) <- fetchByKey @Account (custodian, owner) 
+        exercise accountCid Create_Cash_Account with ..

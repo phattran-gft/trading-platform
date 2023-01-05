@@ -1,0 +1,63 @@
+module Daml.Trading.Tests.NFTTest where 
+
+import DA.Set qualified as S (empty)
+import Daml.Script 
+
+import Daml.Finance.Interface.Types.Common (InstrumentKey(..), Id(..))
+
+import Daml.Trading.Account.CreateAccount qualified as CreateAccount
+import Daml.Trading.Account.Account qualified as Account
+import Daml.Trading.Nft.Nft qualified as Nft
+import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
+import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup 
+
+setup: Script () 
+setup = do 
+  (public, admin, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid) <- HoldingSetup.initialize 
+  [alice] <- UserSetup.createUsers public ["Alice"]
+  
+  aliceRequestCid <- submit alice do
+    createCmd CreateAccount.AccountRequest
+      with
+        owner = alice
+        custodian = admin
+        accountType = Account.Retail 
+        username = "alice" 
+        realName = "Alice Ackerson" 
+        passportNumber = "222222" 
+        nationalId = "" 
+        address  = "New York" 
+  (aliceAccountCid, _) <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
+  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Nft_Account 
+    with 
+      description = "Alice Nft Account" 
+      accountFactoryCid 
+      holdingFactoryCid = nftHoldingFactoryCid 
+      instrumentFactoryCid 
+      observers = [] 
+
+  nftIssueRequestCid <- submit alice do 
+    createCmd Nft.NftRequest 
+      with 
+        owner = alice 
+        admin 
+        pictureName = "Picture" 
+        pictureType = Nft.Landscape 
+        pictureDescription = "Picture Description" 
+        rarity = Nft.Rare 
+        royaltyRate = 0.025 
+        initialPrice = 100.0 
+        observers = S.empty
+
+  aliceNftKey <- submit admin $ exerciseCmd nftIssueRequestCid Nft.Accept 
+
+  let 
+    expectedAliceNftKey = InstrumentKey with 
+      depository = admin 
+      issuer = admin 
+      id = Id "Picture" 
+      version = "0"
+  
+
+  pure ()

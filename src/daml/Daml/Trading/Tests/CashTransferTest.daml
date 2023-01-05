@@ -1,0 +1,59 @@
+module Daml.Trading.Tests.CashTransferTest where
+
+import Daml.Script
+
+import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
+import Daml.Trading.Account.Account qualified as Account
+import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
+import Daml.Trading.Tests.CashIssuanceTest qualified as CashInssuanceTest
+
+shouldSuccessfullyTransferCash: Script ()
+shouldSuccessfullyTransferCash = do
+  
+  (public, admin, alice, bob, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid,
+    adminHoldingCid,aliceCashHoldingCid, aliceCashHoldingCid2, adminHoldingCidRemain,
+    aliceAccountCid,bobAccountCid,bobServiceCid) <- CashInssuanceTest.cashIssuance
+
+  let
+    bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id Account.cashLabel
+  
+  transferRequestCid <- submit bob do
+    createCmd CashTransfer.TransferRequest
+      with
+        receiverAccount = bobAccountKey
+        instrument = cashInstrument
+        amount = 350_000.0
+        owner = alice
+        custodian = admin
+
+  (newbobHoldingCid, newaliceRemainingCid) <- submitMulti [alice] [public] do
+    exerciseCmd transferRequestCid CashTransfer.Accept
+      with
+        holdingCids = [aliceCashHoldingCid,aliceCashHoldingCid2]
+  pure()
+
+
+shouldFailTransferCashOnBalanceCheck: Script ()
+shouldFailTransferCashOnBalanceCheck = do
+  (public, admin, alice, bob, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid,
+    adminHoldingCid,aliceCashHoldingCid, aliceCashHoldingCid2, adminHoldingCidRemain,
+    aliceAccountCid,bobAccountCid,bobServiceCid) <- CashInssuanceTest.cashIssuance
+
+  let
+    bobAccountKey = AccountKey with custodian = admin, owner = bob, id = Id Account.cashLabel
+  
+  transferRequestCid <- submit bob do
+    createCmd CashTransfer.TransferRequest
+      with
+        receiverAccount = bobAccountKey
+        instrument = cashInstrument
+        amount = 2_000_000.0
+        owner = alice
+        custodian = admin
+
+  submitMultiMustFail [alice] [public] do
+    exerciseCmd transferRequestCid CashTransfer.Accept
+      with
+        holdingCids = [aliceCashHoldingCid]

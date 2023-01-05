@@ -1,0 +1,71 @@
+module Daml.Trading.Reward.TradingPoint where 
+
+configPointsRate : Decimal = 500.0 -- Assum 500USD = 1 point
+
+calPointAndAmountRemain : Decimal -> (Int, Decimal)
+calPointAndAmountRemain tradeAmount = (point, tradePointRemain)
+  where
+    pointRate = configPointsRate
+    point = truncate (tradeAmount / pointRate) 
+    tradePointRemain = tradeAmount - (pointRate * intToDecimal(point))
+
+
+template TradeSuccess
+  with
+    admin : Party
+    seller : Party
+    buyer : Party
+    tradeAmount : Decimal
+    asset : Text
+  where 
+    signatory admin
+    observer seller, buyer
+    ensure seller /= buyer
+    choice IssueRewardPoint : (ContractId TradingPoint, ContractId TradingPoint)
+      controller admin
+      do  
+        (oldSellerTradingPointCid, oldSellerTradingPoint) <- fetchByKey @TradingPoint (admin, seller)
+        (oldBuyerTradingPointCid, oldBuyerTradingPoint) <- fetchByKey @TradingPoint (admin, buyer)
+        let       
+          (currentPoint, currentTradeAmountRemain) = calPointAndAmountRemain tradeAmount
+          
+          newSellerTradeAmountRemain = currentTradeAmountRemain + oldSellerTradingPoint.tradeAmountRemain
+          newBuyerTradeAmountRemain = currentTradeAmountRemain + oldBuyerTradingPoint.tradeAmountRemain
+
+          (sellerPoint, tradeAmountRemainSeller) = calPointAndAmountRemain newSellerTradeAmountRemain
+          (buyerPoint, tradeAmountRemainBuyer) = calPointAndAmountRemain newBuyerTradeAmountRemain
+          
+          finalSellerPoint = oldSellerTradingPoint.rewardPoints + currentPoint + sellerPoint
+          finalBuyerPointt = oldBuyerTradingPoint.rewardPoints + currentPoint + buyerPoint
+        
+        updateSeller <- exercise oldSellerTradingPointCid UpdateRewardPoints with
+          inputRewardPoints = finalSellerPoint
+          inputTradeAmountRemain = tradeAmountRemainSeller
+          
+        updateBuyer <- exercise oldBuyerTradingPointCid UpdateRewardPoints with
+          inputRewardPoints = finalBuyerPointt
+          inputTradeAmountRemain = tradeAmountRemainBuyer
+
+        pure(updateSeller,updateBuyer)
+
+
+template TradingPoint
+  with
+    custodian : Party
+    owner : Party
+    rewardPoints : Int
+    tradeAmountRemain : Decimal
+  where
+    signatory custodian
+    observer owner
+    key (custodian, owner) : (Party, Party)
+    maintainer key._1
+    choice UpdateRewardPoints: ContractId TradingPoint
+        with
+          inputRewardPoints : Int
+          inputTradeAmountRemain : Decimal
+        controller custodian
+        do
+          create this with
+            rewardPoints = inputRewardPoints
+            tradeAmountRemain = inputTradeAmountRemain

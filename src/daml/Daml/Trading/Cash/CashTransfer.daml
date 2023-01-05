@@ -1,0 +1,56 @@
+module Daml.Trading.Cash.CashTransfer where 
+
+import DA.Assert ((===))
+import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
+import Daml.Finance.Interface.Holding.Transferable qualified as Transferable (I, Transfer(..))
+import Daml.Finance.Interface.Holding.Util (getAmount, getInstrument)
+import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K)
+import Daml.Finance.Interface.Types.Common (AccountKey(..))
+import Daml.Trading.Account.Account qualified as CreateAccount
+
+template TransferRequest
+  with
+    custodian : Party
+    owner : Party
+    receiverAccount : AccountKey
+    instrument : Instrument.K
+    amount : Decimal
+    
+  where
+    signatory receiverAccount.owner
+    observer owner
+
+    ensure amount > 0.0
+
+    choice Accept : (ContractId Holding.I, Optional (ContractId Holding.I))
+      with
+        holdingCids : [ContractId Holding.I]
+      controller owner
+      do
+        -- Merge holding before transfer
+        (accountCid,_) <- fetchByKey @CreateAccount.Account (custodian, owner)
+        mergeholdingCid <- exercise accountCid CreateAccount.Merge with holdingCids = holdingCids
+        holding <- fetch mergeholdingCid
+        getInstrument holding === instrument
+        assertMsg "Balance insufficient" (amount <= getAmount holding)
+        
+        (transferCid,remainingOpt) <- exercise accountCid CreateAccount.Split
+          with
+            holdingCid = mergeholdingCid
+            amount = amount
+        let
+          transferableCid : ContractId Transferable.I = coerceContractId transferCid
+        newTransferableCid <- exercise transferableCid Transferable.Transfer
+          with
+            newOwnerAccount = receiverAccount
+        let
+          lastTransferableCid : ContractId Holding.I = coerceContractId newTransferableCid
+        pure (lastTransferableCid,remainingOpt)
+
+    choice Decline : ()
+      controller owner
+      do pure ()
+
+    choice Withdraw : ()
+      controller receiverAccount.owner
+      do pure ()

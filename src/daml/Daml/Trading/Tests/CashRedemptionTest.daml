@@ -1,0 +1,69 @@
+module Daml.Trading.Tests.CashRedemptionTest where
+
+import Daml.Script
+
+import Daml.Trading.Account.Account qualified as Account
+import Daml.Trading.Cash.CashRedemption qualified as CashRedemption
+import DA.Optional (fromSome)
+import Daml.Trading.Tests.CashIssuanceTest qualified as CashInssuanceTest
+
+
+shouldSuccessfullyRedeemCash: Script ()
+shouldSuccessfullyRedeemCash = do
+  (public, admin, alice, bob, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid,
+    adminHoldingCid,aliceCashHoldingCid, aliceCashHoldingCid2, adminHoldingCidRemain,
+    aliceAccountCid,bobAccountCid,bobServiceCid) <- CashInssuanceTest.cashIssuance
+  
+  aliceMergeCashHoldingCid <- submit alice do exerciseCmd aliceAccountCid Account.Merge with holdingCids = [aliceCashHoldingCid,aliceCashHoldingCid2]
+
+  aliceRequestWithdrawal <- submit alice do
+    createCmd CashRedemption.WithdrawalRequest
+      with 
+        custodian = admin
+        owner = alice
+        holdingCid = aliceMergeCashHoldingCid
+        amount = 2_000.0
+        instrument = cashInstrument
+
+  aliceHoldingCidRemainOpt <- submit admin do 
+    exerciseCmd aliceRequestWithdrawal CashRedemption.Accept
+
+  let 
+    aliceHoldingCidRemain = fromSome aliceHoldingCidRemainOpt
+
+  aliceRequestWithdrawal2 <- submit alice do
+    createCmd CashRedemption.WithdrawalRequest
+      with 
+        custodian = admin
+        owner = alice
+        holdingCid = aliceHoldingCidRemain
+        amount = 1_000_000.0
+        instrument = cashInstrument
+
+  aliceCashHoldingCidremainingOpt <- submit admin do 
+    exerciseCmd aliceRequestWithdrawal2 CashRedemption.Accept
+
+  pure()
+
+
+shouldFailOnBalanceCheck: Script ()
+shouldFailOnBalanceCheck = do
+  (public, admin, alice, bob, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid,
+    adminHoldingCid,aliceCashHoldingCid, aliceCashHoldingCid2, adminHoldingCidRemain,
+    aliceAccountCid,bobAccountCid,bobServiceCid) <- CashInssuanceTest.cashIssuance
+
+  aliceRequestWithdrawal <- submit alice do
+    createCmd CashRedemption.WithdrawalRequest
+      with 
+        custodian = admin
+        owner = alice
+        holdingCid = aliceCashHoldingCid
+        amount = 1_005_000.0
+        instrument = cashInstrument
+
+  aliceHoldingCidRemainOpt <- submitMustFail admin do 
+    exerciseCmd aliceRequestWithdrawal CashRedemption.Accept
+
+  pure()

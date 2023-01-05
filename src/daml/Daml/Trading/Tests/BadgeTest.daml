@@ -1,0 +1,32 @@
+module Daml.Trading.Tests.BadgeTest where
+
+import Daml.Script 
+import Daml.Trading.Account.Account qualified as Account
+import Daml.Trading.Reward.Badge qualified as Badge
+import Daml.Trading.Tests.RewardPointTest qualified as RewardPointTest
+  
+
+sucessfullyClaimBadgeAfterTrade : Script ()
+sucessfullyClaimBadgeAfterTrade = do
+  
+  (alice) <- RewardPointTest.successfullyReceivePoints
+
+  [(aliceAccountCid,_)] <- query @Account.Account alice
+
+  aliceRedeem1 <- submit alice do
+    exerciseCmd aliceAccountCid Account.Redeem_Badge with 
+      redeem_badge = Badge.Novice_Trader 
+
+  submitMustFail alice do
+    exerciseCmd aliceRedeem1 Account.Redeem_Badge with 
+      redeem_badge = Badge.Hall_of_Fame_Trader
+
+  aliceRedeem2 <- submit alice do
+    exerciseCmd aliceRedeem1 Account.Redeem_Badge with 
+      redeem_badge = Badge.Pro_Trader
+
+  submit alice do
+    exerciseCmd aliceRedeem2 Account.Redeem_Badge with 
+      redeem_badge = Badge.Hall_of_Fame_Trader
+
+  pure()

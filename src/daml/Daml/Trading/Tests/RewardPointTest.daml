@@ -1,0 +1,89 @@
+module Daml.Trading.Tests.RewardPointTest where
+
+import DA.Optional (fromSome)
+import DA.Set as Set (fromList, singleton)
+import Daml.Script 
+import Daml.Finance.Interface.Types.Common (InstrumentKey(..), AccountKey(..), Id(..))
+import Daml.Finance.Interface.Settlement.Types (Allocation(..), Approval(..))
+import Daml.Finance.Interface.Settlement.Factory qualified as Factory (I)
+import Daml.Finance.Settlement.Factory (Factory(..))
+import Daml.Trading.Account.Account qualified as Account
+import Daml.Trading.Nft.Nft qualified as Nft 
+import Daml.Trading.Service.Service qualified as Service 
+import Daml.Trading.Service.Trade qualified as Trade 
+import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (instrumentData)
+import Daml.Trading.Tests.CashIssuanceTest qualified as CashInssuanceTest
+import Daml.Trading.Reward.TradingPoint qualified as TradingPoint
+
+successfullyReceivePoints : Script RewardPointTestState
+successfullyReceivePoints = do
+  (public, admin, alice, bob, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid,
+    adminHoldingCid,aliceCashHoldingCid, aliceCashHoldingCid2, adminHoldingCidRemain,
+    aliceAccountCid,bobAccountCid,bobServiceCid) <- CashInssuanceTest.cashIssuance
+
+  let 
+    (cashInstrumentId, cashInstrumentVersion) = HoldingSetup.instrumentData
+    aliceCashAccKey = AccountKey with custodian = admin, owner = alice, id = Id Account.cashLabel
+    aliceNftAccKey = AccountKey with custodian = admin, owner = alice, id = Id Account.nftLabel
+    bobCashAccKey = AccountKey with custodian = admin, owner = bob, id = Id Account.cashLabel
+    bobNftAccKey = AccountKey with custodian = admin, owner = bob, id = Id Account.nftLabel
+    cashInstrument = InstrumentKey with issuer = admin, depository = admin, id = cashInstrumentId, version = cashInstrumentVersion
+
+  nftIssueRequestCid <- submit bob do 
+    createCmd Nft.NftRequest 
+      with 
+        owner = bob 
+        admin 
+        pictureName = "Picture" 
+        pictureType = Nft.Landscape 
+        pictureDescription = "Picture Description" 
+        rarity = Nft.Rare 
+        royaltyRate = 0.025 
+        initialPrice = 1_000.0 
+        observers = singleton alice 
+  nftKey <- submit admin $ exerciseCmd nftIssueRequestCid Nft.Accept 
+  (nftCid, nft) <- fromSome <$> queryContractKey @Nft.Nft bob nftKey
+
+  settlementFactoryCid <- toInterfaceContractId @Factory.I <$> submit admin do
+    createCmd Factory
+      with
+        provider = admin
+        observers = Set.fromList [alice, bob] 
+  let 
+    nftKey = InstrumentKey with depository = admin, issuer = admin, id = Id "Picture", version = Nft.nftVersion
+
+  tradeCid <- submit bob $ exerciseCmd bobServiceCid Service.Create_Trade with 
+    buyerCashAccKey = aliceCashAccKey 
+    amount = 3_000.0 
+    cashInstrument
+    nftKey 
+    settlementFactoryCid 
+
+  tradeCid <- submit bob $ exerciseCmd tradeCid Trade.Seller_Counter with newAmount = 988_050.0
+  tradeCid <- submit alice $ exerciseCmd tradeCid Trade.Agree with actor = alice, agreedAmount = 988_050.0 
+  tradeCid <- submit bob $ exerciseCmd tradeCid Trade.Agree with actor = bob, agreedAmount = 988_050.0 
+
+  tradeSettlementCid <- submit alice $ exerciseCmd tradeCid Trade.Create_Settlement with actor = alice
+
+  tradeSettlementCid <- submit alice $ exerciseCmd tradeSettlementCid Trade.Allocate_Pay with 
+    allocation = Pledge $ coerceContractId aliceCashHoldingCid
+  tradeSettlementCid <- submit bob $ exerciseCmd tradeSettlementCid Trade.Approve_Pay with 
+    approval = TakeDelivery bobCashAccKey
+  tradeSettlementCid <- submit bob $ exerciseCmd tradeSettlementCid Trade.Allocate_Receive with 
+    allocation = Pledge $ coerceContractId nft.nftHoldingCid
+  tradeSettlementCid <- submit alice $ exerciseCmd tradeSettlementCid Trade.Approve_Receive with 
+    approval = TakeDelivery aliceNftAccKey
+  
+  (aliceNftHolding, bobCashHolding, tradeSuccessfullySignal) <- submitMulti [alice] [public] $ exerciseCmd tradeSettlementCid Trade.Trade_Settle
+
+  (newPointSellerCid, newPointBuyerCid) <- submit admin $ exerciseCmd tradeSuccessfullySignal TradingPoint.IssueRewardPoint
+  
+  Some sellerTradingPoint <- queryContractId bob newPointSellerCid
+  Some buyerTradingPoint <- queryContractId alice newPointBuyerCid
+
+  assert (sellerTradingPoint.rewardPoints == 1976)
+  assert (buyerTradingPoint.tradeAmountRemain == 50.0)
+
+  pure(alice)
+type RewardPointTestState = (Party)

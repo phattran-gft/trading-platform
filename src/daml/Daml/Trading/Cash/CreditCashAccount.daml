@@ -1,0 +1,80 @@
+module Daml.Trading.Cash.CreditCashAccount where 
+
+import Daml.Finance.Interface.Holding.Account qualified as Account (Credit(..), I, exerciseInterfaceByKey)
+import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
+import Daml.Finance.Interface.Instrument.Base.Instrument qualified as Instrument (K, qty)
+import Daml.Finance.Interface.Types.Common (AccountKey(..), Id(..))
+import Daml.Trading.Account.Account qualified as CreateAccount
+import Daml.Trading.Cash.CashTransfer qualified as CashTransfer
+
+template AdminCreditRequest
+  with
+    owner: Party 
+    custodian: Party 
+    instrument : Instrument.K
+    amount : Decimal
+  where
+    signatory owner
+    observer custodian
+
+    ensure amount > 0.0
+
+    choice Accept : ContractId Holding.I
+      controller custodian 
+      do
+        let
+          accountKey = AccountKey with custodian, owner, id = Id CreateAccount.cashLabel
+        Account.exerciseInterfaceByKey @Account.I accountKey custodian Account.Credit
+          with
+            quantity = Instrument.qty amount instrument
+
+    choice Decline : ()
+      controller custodian
+      do pure ()
+
+    choice Withdraw : ()
+      controller owner
+      do pure ()
+
+
+template UserCreditRequest
+  with
+    owner: Party 
+    custodian: Party 
+    amount : Decimal
+    instrument : Instrument.K
+  where
+    signatory owner
+    observer custodian
+
+    ensure amount > 0.0
+
+    choice Credit : (ContractId Holding.I, Optional (ContractId Holding.I))
+      with
+        holdingCid : ContractId Holding.I
+      controller custodian
+      do
+        let
+          userAccount = AccountKey with custodian = custodian, owner = owner, id = Id CreateAccount.cashLabel
+
+        transferRequest <- create CashTransfer.TransferRequest
+          with
+            receiverAccount = userAccount
+            instrument = instrument
+            amount = amount
+            owner = custodian
+            custodian = custodian
+
+        (userHoldingCid, adminRemaining) <- exercise transferRequest CashTransfer.Accept
+          with
+            holdingCids = [holdingCid]
+
+        pure(userHoldingCid,adminRemaining)
+    
+    choice Reject : ()
+      controller custodian
+      do pure ()
+
+    choice Remove : ()
+      controller owner
+      do pure ()

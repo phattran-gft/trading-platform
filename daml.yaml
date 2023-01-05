@@ -10,12 +10,14 @@ dependencies:
   - daml-prim
   - daml-stdlib
   - daml-script
+  - daml-trigger
 data-dependencies:
   # INTERFACE DEPENDENCIES
   - .lib/daml-finance-interface-holding-0.1.3.dar
   - .lib/daml-finance-interface-instrument-base-0.1.3.dar
   - .lib/daml-finance-interface-lifecycle-0.1.3.dar
   - .lib/daml-finance-interface-settlement-0.1.3.dar
+  - .lib/daml-finance-interface-util-0.1.3.dar
   - .lib/daml-finance-interface-types-0.1.3.dar
   # IMPLEMENTATION DEPENDENCIES
   - .lib/daml-finance-holding-0.1.3.dar
@@ -28,3 +30,5 @@ build-options:
   - --target=1.15
 sandbox-options:
   - --config=canton.config
+init-script:
+  Daml.Trading.Scripts.HoldingSetup:initialize

@@ -1,0 +1,19 @@
+module Daml.Trading.Reward.Badge where 
+
+data BadgeType 
+  = Novice_Trader
+  | Pro_Trader
+  | Hall_of_Fame_Trader
+  deriving (Eq, Show)
+
+template Badge 
+  with 
+    admin : Party 
+    owner : Party
+    badge : BadgeType
+    
+  where
+    signatory admin
+    observer owner
+    key (admin, owner, badge) : (Party, Party, BadgeType)
+    maintainer key._1

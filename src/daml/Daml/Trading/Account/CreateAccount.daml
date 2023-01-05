@@ -1,0 +1,56 @@
+module Daml.Trading.Account.CreateAccount where 
+
+import Daml.Trading.Account.Account 
+import Daml.Trading.Service.Service 
+import Daml.Trading.Reward.TradingPoint qualified as TradingPoint 
+
+template AccountRequest 
+  with 
+    custodian: Party 
+    owner: Party 
+    accountType: AccountType 
+    username: Text 
+    realName: Text 
+    passportNumber: Text 
+    nationalId: Text 
+    address: Text 
+  where 
+    signatory owner 
+    observer custodian 
+
+    choice Request_Accept: (ContractId Account, ContractId Service) 
+      controller custodian 
+      do
+        serviceCid <- create Service 
+          with 
+            custodian 
+            owner 
+        accountCid <- create Account 
+          with 
+            custodian 
+            owner 
+            accountType 
+            username 
+            realName 
+            passportNumber 
+            nationalId 
+            address 
+            optCashAccount = None 
+            optNftAccount = None 
+            badges = []
+
+        create TradingPoint.TradingPoint with
+          custodian = custodian
+          owner = owner
+          rewardPoints = 0
+          tradeAmountRemain =0.0
+
+        pure (accountCid, serviceCid)
+
+    choice Request_Decline : ()
+      controller custodian
+      do pure ()
+
+    choice Request_Withdraw : ()
+      controller owner
+      do pure ()

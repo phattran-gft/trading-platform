@@ -1,0 +1,120 @@
+module Daml.Trading.Tests.CashIssuanceTest where 
+
+import Daml.Script 
+import Daml.Finance.Interface.Types.Common (InstrumentKey(..))
+import Daml.Finance.Interface.Holding.Base qualified as Holding (I)
+import Daml.Trading.Account.CreateAccount qualified as CreateAccount
+import Daml.Trading.Account.Account qualified as Account
+import Daml.Trading.Cash.CreditCashAccount qualified as CreditCashAccount
+import Daml.Trading.Scripts.UserSetup qualified as UserSetup (createUsers)
+import Daml.Trading.Scripts.HoldingSetup qualified as HoldingSetup (initialize, instrumentData)
+import Daml.Trading.Service.Service qualified as Service
+import DA.Optional (fromSome)
+import Daml.Finance.Interface.Holding.Factory.Account qualified as Account (F)
+import Daml.Finance.Interface.Holding.Factory.Holding qualified as Holding (F)
+import Daml.Finance.Interface.Instrument.Base.Factory qualified as Instrument (F)
+
+cashIssuance : Script CashIssuanceState
+cashIssuance = do 
+
+  (public, admin, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid, adminHoldingCid) <- HoldingSetup.initialize 
+  [alice, bob] <- UserSetup.createUsers public ["Alice", "Bob"]
+
+  aliceRequestCid <- submit alice do
+    createCmd CreateAccount.AccountRequest
+      with
+        owner = alice
+        custodian = admin
+        accountType = Account.Retail 
+        username = "alice" 
+        realName = "Alice Ackerson" 
+        passportNumber = "222222" 
+        nationalId = "" 
+        address  = "New York" 
+  (aliceAccountCid, _) <- submit admin $ exerciseCmd aliceRequestCid CreateAccount.Request_Accept
+  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Cash_Account 
+    with 
+      description = "Alice Cash Account"
+      accountFactoryCid = accountFactoryCid
+      holdingFactoryCid = cashHoldingFactoryCid
+      observers = []
+
+  aliceAccountCid <- submit admin $ exerciseCmd aliceAccountCid Account.Create_Nft_Account 
+    with 
+      description = "Alice Nft Account"
+      accountFactoryCid = accountFactoryCid
+      holdingFactoryCid = nftHoldingFactoryCid
+      instrumentFactoryCid 
+      observers = []
+
+  bobRequestCid <- submit bob do
+    createCmd CreateAccount.AccountRequest
+      with
+        owner = bob
+        custodian = admin
+        accountType = Account.Retail 
+        username = "bob" 
+        realName = "Bob Bader" 
+        passportNumber = "" 
+        nationalId = "333333" 
+        address  = "Boston" 
+  (bobAccountCid, bobServiceCid) <- submit admin $ exerciseCmd bobRequestCid CreateAccount.Request_Accept 
+  bobAccountCid <- submit admin $ exerciseCmd bobAccountCid Account.Create_Cash_Account 
+    with 
+      description = "Bob Cash Account"
+      accountFactoryCid = accountFactoryCid
+      holdingFactoryCid = cashHoldingFactoryCid 
+      observers = [alice]
+  bobAccountCid <- submit admin $ exerciseCmd bobAccountCid Account.Create_Nft_Account 
+    with 
+      description = "Bob Nft Account"
+      accountFactoryCid = accountFactoryCid
+      holdingFactoryCid = nftHoldingFactoryCid 
+      instrumentFactoryCid = instrumentFactoryCid
+      observers = [alice]
+
+  let 
+    (instrumentId, instrumentVersion) = HoldingSetup.instrumentData
+
+  aliceRequestCid <- submit alice do
+    createCmd CreditCashAccount.UserCreditRequest
+      with
+        owner = alice
+        custodian = admin
+        instrument = cashInstrument
+        amount = 1_000_000.0
+
+  (aliceCashHoldingCid,adminRemainingOpt) <- submit admin do 
+    exerciseCmd aliceRequestCid CreditCashAccount.Credit
+      with
+        holdingCid = adminHoldingCid
+
+  let 
+    adminHoldingCidRemain = fromSome adminRemainingOpt
+
+  aliceRequestCid2 <- submit alice do
+    createCmd CreditCashAccount.UserCreditRequest
+      with
+        owner = alice
+        custodian = admin
+        instrument = InstrumentKey with issuer = admin; depository = admin; id = instrumentId; version = instrumentVersion
+        amount = 3_000.0
+
+  (aliceCashHoldingCid2,adminRemainingOpt) <- submit admin do 
+    exerciseCmd aliceRequestCid2 CreditCashAccount.Credit
+      with
+        holdingCid = adminHoldingCidRemain
+
+  let 
+    adminHoldingCidRemain = fromSome adminRemainingOpt
+
+  pure (public, admin, alice, bob, cashInstrument, accountFactoryCid, 
+    cashHoldingFactoryCid, nftHoldingFactoryCid, instrumentFactoryCid,
+    adminHoldingCid, aliceCashHoldingCid, aliceCashHoldingCid2, adminHoldingCidRemain,
+    aliceAccountCid, bobAccountCid, bobServiceCid)
+
+type CashIssuanceState = (Party, Party, Party, Party, InstrumentKey, ContractId Account.F,
+  ContractId Holding.F, ContractId Holding.F, ContractId Instrument.F,
+  ContractId Holding.I, ContractId Holding.I, ContractId Holding.I, ContractId Holding.I,
+  ContractId Account.Account, ContractId Account.Account,ContractId Service.Service)

@@ -1,0 +1,21 @@
+module Daml.Triggers.TradingSuccessTrigger where
+
+import Daml.Trigger
+import Daml.Trading.Reward.TradingPoint
+import DA.Foldable (forA_)
+
+
+issueTradingPointTrigger: Trigger ()
+issueTradingPointTrigger = Trigger with
+  initialize = pure ()
+  updateState = \_ -> pure ()
+  rule = \p -> do
+    debug ("Issue trading point")
+    adminTradeData <- queryFilter @TradeSuccess (\tx -> tx.admin==p)
+    forA_ adminTradeData (\tradeSuccessdata -> do
+      let
+        tradeSuccessCid = tradeSuccessdata._1
+      dedupExercise tradeSuccessCid IssueRewardPoint
+      )
+  registeredTemplates = RegisteredTemplates [registeredTemplate @TradeSuccess]
+  heartbeat = None
