@@ -45,4 +45,3 @@ template Service
         whenSome account.optNftAccount \(nftAccountFactoryCid, _, _, nftAccountKey) -> do 
           exercise nftAccountFactoryCid Account.Remove with account = nftAccountKey 
         archive accountCid 
-        pure ()

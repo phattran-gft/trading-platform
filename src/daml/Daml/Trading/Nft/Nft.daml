@@ -24,7 +24,7 @@ data Rarity
 
 nftVersion = "0"
 
-template Request
+template NftRequest
   with
     owner: Party 
     admin: Party 

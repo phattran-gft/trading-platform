@@ -99,7 +99,7 @@ setup = do
         holdingCid = adminHoldingCid
 
   nftIssueRequestCid <- submit bob do 
-    createCmd Nft.Request 
+    createCmd Nft.NftRequest 
       with 
         owner = bob 
         admin 
