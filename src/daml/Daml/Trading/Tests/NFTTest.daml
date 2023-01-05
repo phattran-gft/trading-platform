@@ -38,7 +38,7 @@ setup = do
       observers = [] 
 
   nftIssueRequestCid <- submit alice do 
-    createCmd Nft.Request 
+    createCmd Nft.NftRequest 
       with 
         owner = alice 
         admin 
